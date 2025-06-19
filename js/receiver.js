@@ -257,6 +257,41 @@ async function copyToClipboard() {
     }
 }
 
+// テキストを共有
+async function shareText() {
+    const text = receivedText.textContent;
+    
+    // Web Share APIが利用可能かチェック
+    if (navigator.share) {
+        try {
+            await navigator.share({
+                title: 'QRコードで受信したテキスト',
+                text: text
+            });
+        } catch (error) {
+            if (error.name !== 'AbortError') {
+                console.error('共有エラー:', error);
+                // フォールバック: クリップボードにコピー
+                fallbackShare(text);
+            }
+        }
+    } else {
+        // Web Share APIが利用できない場合のフォールバック
+        fallbackShare(text);
+    }
+}
+
+// 共有のフォールバック処理
+function fallbackShare(text) {
+    try {
+        navigator.clipboard.writeText(text);
+        alert('共有機能が利用できないため、テキストをクリップボードにコピーしました');
+    } catch (error) {
+        console.error('フォールバック共有失敗:', error);
+        alert('共有に失敗しました');
+    }
+}
+
 // リセット
 function resetReceiver() {
     headerInfo = null;

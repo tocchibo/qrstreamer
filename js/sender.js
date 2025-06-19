@@ -34,11 +34,75 @@ function updateTextInfo() {
     const text = inputText.value;
     charCount.textContent = text.length;
     byteCount.textContent = Utils.getByteLength(text);
+    
+    // 送信中でない場合のみ、ヘッダQRを自動表示
+    if (!isTransmitting) {
+        if (text.trim()) {
+            displayPreviewHeader(text);
+        } else {
+            // テキストが空の場合は元の表示に戻す
+            qrDisplay.innerHTML = '<p>QRコードがここに表示されます</p>';
+        }
+    }
+}
+
+// プレビュー用ヘッダQR表示
+function displayPreviewHeader(text) {
+    try {
+        // データのハッシュ計算
+        const dataHash = Utils.calculateHash(text);
+        const dataSize = Utils.getByteLength(text);
+        
+        // データ分割してフレーム数を計算
+        const maxDataSize = 600;
+        const chunks = Utils.splitData(text, maxDataSize);
+        const totalFrameCount = chunks.length + 1;
+        
+        // ヘッダーQRコード生成
+        const headerData = QRFormat.createHeader(totalFrameCount, dataSize, dataHash);
+        
+        // QRコード表示
+        qrDisplay.innerHTML = '';
+        
+        if (typeof QRCode === 'undefined') {
+            console.error('QRCodeライブラリが読み込まれていません');
+            return;
+        }
+        
+        const qrContainer = document.createElement('div');
+        qrDisplay.appendChild(qrContainer);
+        
+        const qrcode = new QRCode(qrContainer, {
+            text: headerData,
+            width: 300,
+            height: 300,
+            correctLevel: QRCode.CorrectLevel.L
+        });
+        
+        // プレビュー表示であることを示す
+        const previewLabel = document.createElement('div');
+        previewLabel.textContent = 'プレビュー（ヘッダーフレーム）';
+        previewLabel.style.textAlign = 'center';
+        previewLabel.style.color = '#666';
+        previewLabel.style.fontSize = '14px';
+        previewLabel.style.marginTop = '10px';
+        qrDisplay.appendChild(previewLabel);
+        
+    } catch (error) {
+        console.error('プレビュー表示エラー:', error);
+    }
 }
 
 // 表示間隔の更新
 function updateIntervalDisplay() {
     intervalValue.textContent = intervalSlider.value;
+    
+    // 送信中の場合はリアルタイムで間隔を更新
+    if (isTransmitting && transmissionInterval) {
+        clearInterval(transmissionInterval);
+        const newInterval = parseInt(intervalSlider.value);
+        transmissionInterval = setInterval(displayNextFrame, newInterval);
+    }
 }
 
 // 送信開始

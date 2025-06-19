@@ -100,7 +100,8 @@ button.stop:hover {
 
 .camera-preview video {
     width: 100%;
-    height: auto;
+    height: 400px;
+    object-fit: cover;
     border-radius: 8px;
 }
 
