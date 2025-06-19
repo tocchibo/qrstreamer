@@ -196,9 +196,6 @@ function displayNextFrame() {
         frameType.textContent = `データフレーム ${frame.sequence}`;
     }
     
-    // フレームデバッグ情報更新
-    displayFrameDebugInfo();
-    
     // QRコード生成と表示
     qrDisplay.innerHTML = '';
     
