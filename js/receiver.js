@@ -27,6 +27,7 @@ const receivedText = document.getElementById('receivedText');
 const errorMessage = document.getElementById('errorMessage');
 const debugInfo = document.getElementById('debugInfo');
 const debugLog = document.getElementById('debugLog');
+const debugToggleButton = document.getElementById('debugToggleButton');
 
 // デバッグ機能
 let debugEnabled = false;
@@ -42,19 +43,37 @@ function debugPrint(message) {
 function toggleDebug() {
     debugEnabled = !debugEnabled;
     debugInfo.style.display = debugEnabled ? 'block' : 'none';
+    
     if (debugEnabled) {
-        debugPrint('デバッグモード開始');
+        debugPrint('=== デバッグモード開始 ===');
+        debugPrint(`現在時刻: ${new Date().toLocaleString()}`);
+        debugPrint(`スキャン中: ${scanning}`);
+        debugPrint(`ヘッダー情報: ${headerInfo ? 'あり' : 'なし'}`);
+        debugPrint(`受信済みフレーム数: ${receivedFrames.size}`);
+        debugPrint(`期待フレーム数: ${expectedFrames}`);
+    } else {
+        debugPrint('=== デバッグモード終了 ===');
     }
+}
+
+function testDebug() {
+    debugPrint('デバッグテスト: この機能は正常に動作しています');
+    debugPrint(`ブラウザ: ${navigator.userAgent}`);
+    debugPrint(`画面サイズ: ${window.innerWidth}x${window.innerHeight}`);
+    alert('デバッグテスト完了');
 }
 
 // スキャン開始
 async function startScanning() {
     try {
+        debugPrint('カメラアクセス開始...');
+        
         // カメラアクセス
         video = document.getElementById('video');
         canvas = document.getElementById('canvas');
         context = canvas.getContext('2d');
         
+        debugPrint('getUserMedia呼び出し...');
         const stream = await navigator.mediaDevices.getUserMedia({
             video: {
                 facingMode: 'environment', // 背面カメラを優先
@@ -63,12 +82,16 @@ async function startScanning() {
             }
         });
         
+        debugPrint('カメラストリーム取得成功');
         video.srcObject = stream;
         
         // ビデオのメタデータ読み込み完了を待つ
         video.addEventListener('loadedmetadata', () => {
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
+            
+            debugPrint(`ビデオサイズ: ${video.videoWidth}x${video.videoHeight}`);
+            debugPrint('UI更新中...');
             
             // UI更新
             startButton.style.display = 'none';
@@ -79,6 +102,7 @@ async function startScanning() {
             
             // スキャン開始
             scanning = true;
+            debugPrint('QRコードスキャン開始（100ms間隔）');
             scanInterval = setInterval(scanQRCode, 100); // 100msごとにスキャン
         });
         
@@ -116,8 +140,14 @@ function stopScanning() {
 }
 
 // QRコードスキャン
+let scanCount = 0;
 function scanQRCode() {
+    scanCount++;
+    
     if (!scanning || !video || video.readyState !== video.HAVE_ENOUGH_DATA) {
+        if (scanCount % 50 === 0) { // 5秒ごとに状態ログ
+            debugPrint(`スキャン待機中... (${scanCount}回目, readyState: ${video?.readyState})`);
+        }
         return;
     }
     
@@ -131,7 +161,10 @@ function scanQRCode() {
     });
     
     if (code) {
+        debugPrint(`QRコード検出！(${scanCount}回目のスキャンで検出)`);
         processQRCode(code.data);
+    } else if (scanCount % 100 === 0) { // 10秒ごとにスキャン状況をログ
+        debugPrint(`QRコード未検出 (${scanCount}回スキャン済み)`);
     }
 }
 
@@ -335,3 +368,23 @@ async function releaseWakeLock() {
 
 // グローバル関数として登録
 window.toggleDebug = toggleDebug;
+window.testDebug = testDebug;
+
+// ページ読み込み時の初期化
+window.addEventListener('load', () => {
+    // デバッグボタンのイベントリスナー設定
+    if (debugToggleButton) {
+        debugToggleButton.addEventListener('click', toggleDebug);
+    }
+    
+    // 初期デバッグメッセージ
+    debugPrint('受信アプリ初期化完了');
+    debugPrint(`jsQRライブラリ: ${typeof jsQR !== 'undefined' ? '読み込み済み' : '読み込みエラー'}`);
+    
+    // デバッグを最初から有効にする（スマホでの確認用）
+    setTimeout(() => {
+        if (!debugEnabled) {
+            toggleDebug();
+        }
+    }, 1000);
+});
