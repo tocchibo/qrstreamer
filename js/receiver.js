@@ -171,12 +171,23 @@ function scanQRCode() {
 // QRコード処理
 function processQRCode(data) {
     debugPrint(`QRコード読み取り: ${data.substring(0, 50)}...`);
+    
+    // フレーム3の詳細ログ
+    if (data.includes('seq:3')) {
+        debugPrint(`フレーム3詳細: ${data}`);
+    }
+    
     const parsed = QRFormat.parse(data);
     
     if (!parsed) {
         debugPrint(`無効なQRコードフォーマット: ${data}`);
         showError('無効なQRコードです');
         return;
+    }
+    
+    // パース結果の詳細ログ
+    if (parsed.sequence === 3) {
+        debugPrint(`フレーム3パース結果: type=${parsed.type}, seq=${parsed.sequence}, crc=${parsed.crc}, dataLength=${parsed.data ? parsed.data.length : 'undefined'}`);
     }
     
     if (parsed.type === QR_TYPE.HEADER) {

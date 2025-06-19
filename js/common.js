@@ -95,8 +95,8 @@ const QRFormat = {
                 }
             }
 
-            // crc:XXX を解析
-            const crcMatch = qrData.match(/\|crc:([a-f0-9]+)/);
+            // crc:XXX を解析（負の値も含む）
+            const crcMatch = qrData.match(/\|crc:([a-f0-9-]+)/);
             if (crcMatch) {
                 result.crc = crcMatch[1];
             }

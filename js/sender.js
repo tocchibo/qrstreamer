@@ -174,6 +174,7 @@ async function generateQRFrames(text) {
         console.log(`データフレーム${i + 1}: データサイズ${Utils.getByteLength(chunk)}バイト, QRサイズ${Utils.getByteLength(dataQR)}バイト`);
         if (i === chunks.length - 1) {
             console.log(`最後のフレーム詳細: seq=${i + 1}, data="${chunk.substring(0, 50)}...", crc=${crc}`);
+            console.log(`最後のフレーム完全QRデータ: ${dataQR}`);
         }
         
         frames.push({
