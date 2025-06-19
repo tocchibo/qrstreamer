@@ -25,55 +25,15 @@ const frameStatus = document.getElementById('frameStatus');
 const resultSection = document.getElementById('resultSection');
 const receivedText = document.getElementById('receivedText');
 const errorMessage = document.getElementById('errorMessage');
-const debugInfo = document.getElementById('debugInfo');
-const debugLog = document.getElementById('debugLog');
-const debugToggleButton = document.getElementById('debugToggleButton');
-
-// デバッグ機能
-let debugEnabled = false;
-function debugPrint(message) {
-    console.log(message);
-    if (debugEnabled && debugLog) {
-        const timestamp = new Date().toLocaleTimeString();
-        debugLog.innerHTML += `[${timestamp}] ${message}\n`;
-        debugLog.scrollTop = debugLog.scrollHeight;
-    }
-}
-
-function toggleDebug() {
-    debugEnabled = !debugEnabled;
-    debugInfo.style.display = debugEnabled ? 'block' : 'none';
-    
-    if (debugEnabled) {
-        debugPrint('=== デバッグモード開始 ===');
-        debugPrint(`現在時刻: ${new Date().toLocaleString()}`);
-        debugPrint(`スキャン中: ${scanning}`);
-        debugPrint(`ヘッダー情報: ${headerInfo ? 'あり' : 'なし'}`);
-        debugPrint(`受信済みフレーム数: ${receivedFrames.size}`);
-        debugPrint(`期待フレーム数: ${expectedFrames}`);
-    } else {
-        debugPrint('=== デバッグモード終了 ===');
-    }
-}
-
-function testDebug() {
-    debugPrint('デバッグテスト: この機能は正常に動作しています');
-    debugPrint(`ブラウザ: ${navigator.userAgent}`);
-    debugPrint(`画面サイズ: ${window.innerWidth}x${window.innerHeight}`);
-    alert('デバッグテスト完了');
-}
 
 // スキャン開始
 async function startScanning() {
     try {
-        debugPrint('カメラアクセス開始...');
-        
         // カメラアクセス
         video = document.getElementById('video');
         canvas = document.getElementById('canvas');
         context = canvas.getContext('2d');
         
-        debugPrint('getUserMedia呼び出し...');
         const stream = await navigator.mediaDevices.getUserMedia({
             video: {
                 facingMode: 'environment', // 背面カメラを優先
@@ -82,16 +42,12 @@ async function startScanning() {
             }
         });
         
-        debugPrint('カメラストリーム取得成功');
         video.srcObject = stream;
         
         // ビデオのメタデータ読み込み完了を待つ
         video.addEventListener('loadedmetadata', () => {
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
-            
-            debugPrint(`ビデオサイズ: ${video.videoWidth}x${video.videoHeight}`);
-            debugPrint('UI更新中...');
             
             // UI更新
             startButton.style.display = 'none';
@@ -102,7 +58,6 @@ async function startScanning() {
             
             // スキャン開始
             scanning = true;
-            debugPrint('QRコードスキャン開始（100ms間隔）');
             scanInterval = setInterval(scanQRCode, 100); // 100msごとにスキャン
         });
         
@@ -140,14 +95,8 @@ function stopScanning() {
 }
 
 // QRコードスキャン
-let scanCount = 0;
 function scanQRCode() {
-    scanCount++;
-    
     if (!scanning || !video || video.readyState !== video.HAVE_ENOUGH_DATA) {
-        if (scanCount % 50 === 0) { // 5秒ごとに状態ログ
-            debugPrint(`スキャン待機中... (${scanCount}回目, readyState: ${video?.readyState})`);
-        }
         return;
     }
     
@@ -161,62 +110,38 @@ function scanQRCode() {
     });
     
     if (code) {
-        debugPrint(`QRコード検出！(${scanCount}回目のスキャンで検出)`);
         processQRCode(code.data);
-    } else if (scanCount % 100 === 0) { // 10秒ごとにスキャン状況をログ
-        debugPrint(`QRコード未検出 (${scanCount}回スキャン済み)`);
     }
 }
 
 // QRコード処理
 function processQRCode(data) {
-    debugPrint(`QRコード読み取り: ${data.substring(0, 50)}...`);
-    
-    // フレーム3の詳細ログ
-    if (data.includes('seq:3')) {
-        debugPrint(`フレーム3詳細: ${data}`);
-    }
-    
     const parsed = QRFormat.parse(data);
     
     if (!parsed) {
-        debugPrint(`無効なQRコードフォーマット: ${data}`);
         showError('無効なQRコードです');
         return;
     }
     
-    // パース結果の詳細ログ
-    if (parsed.sequence === 3) {
-        debugPrint(`フレーム3パース結果: type=${parsed.type}, seq=${parsed.sequence}, crc=${parsed.crc}, dataLength=${parsed.data ? parsed.data.length : 'undefined'}`);
-    }
-    
     if (parsed.type === QR_TYPE.HEADER) {
         // ヘッダー処理
-        debugPrint(`ヘッダー受信: totalFrames=${parsed.totalFrames}, dataSize=${parsed.dataSize}, hash=${parsed.dataHash}`);
         if (!headerInfo || headerInfo.dataHash !== parsed.dataHash) {
             // 新しい転送セッション
             headerInfo = parsed;
             receivedFrames.clear();
             expectedFrames = parsed.totalFrames - 1; // ヘッダーを除く
-            debugPrint(`新セッション開始: 総フレーム数=${parsed.totalFrames}（データフレーム数=${expectedFrames}）`);
             updateProgress();
-        } else {
-            debugPrint('同じヘッダーを再受信（無視）');
         }
     } else if (parsed.type === QR_TYPE.DATA) {
         // データフレーム処理
         if (!headerInfo) {
-            debugPrint(`ヘッダー未受信のデータフレーム: seq=${parsed.sequence}`);
             showError('ヘッダーが受信されていません');
             return;
         }
         
-        debugPrint(`データフレーム受信: seq=${parsed.sequence}, size=${Utils.getByteLength(parsed.data)}バイト`);
-        
         // CRCチェック
         const calculatedCRC = Utils.calculateCRC(parsed.data);
         if (calculatedCRC !== parsed.crc) {
-            debugPrint(`CRCエラー: seq=${parsed.sequence}, expected=${parsed.crc}, calculated=${calculatedCRC}`);
             showError(`フレーム${parsed.sequence}のデータエラー`);
             return;
         }
@@ -224,16 +149,12 @@ function processQRCode(data) {
         // フレーム保存（重複は上書き）
         if (!receivedFrames.has(parsed.sequence)) {
             receivedFrames.set(parsed.sequence, parsed.data);
-            debugPrint(`フレーム${parsed.sequence}を保存 (${receivedFrames.size}/${expectedFrames})`);
             updateProgress();
             
             // 完了チェック
             if (receivedFrames.size === expectedFrames) {
-                debugPrint('全フレーム受信完了！');
                 onReceiveComplete();
             }
-        } else {
-            debugPrint(`フレーム${parsed.sequence}は既に受信済み`);
         }
     }
 }
@@ -362,10 +283,9 @@ async function requestWakeLock() {
     try {
         if ('wakeLock' in navigator) {
             wakeLock = await navigator.wakeLock.request('screen');
-            debugPrint('Wake Lock取得成功');
         }
     } catch (err) {
-        debugPrint('Wake Lock取得失敗:' + err);
+        console.error('Wake Lock取得失敗:', err);
     }
 }
 
@@ -373,29 +293,5 @@ async function releaseWakeLock() {
     if (wakeLock !== null) {
         await wakeLock.release();
         wakeLock = null;
-        debugPrint('Wake Lock解放');
     }
 }
-
-// グローバル関数として登録
-window.toggleDebug = toggleDebug;
-window.testDebug = testDebug;
-
-// ページ読み込み時の初期化
-window.addEventListener('load', () => {
-    // デバッグボタンのイベントリスナー設定
-    if (debugToggleButton) {
-        debugToggleButton.addEventListener('click', toggleDebug);
-    }
-    
-    // 初期デバッグメッセージ
-    debugPrint('受信アプリ初期化完了');
-    debugPrint(`jsQRライブラリ: ${typeof jsQR !== 'undefined' ? '読み込み済み' : '読み込みエラー'}`);
-    
-    // デバッグを最初から有効にする（スマホでの確認用）
-    setTimeout(() => {
-        if (!debugEnabled) {
-            toggleDebug();
-        }
-    }, 1000);
-});

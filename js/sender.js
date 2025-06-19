@@ -24,43 +24,6 @@ const totalFramesLarge = document.getElementById('totalFramesLarge');
 const frameType = document.getElementById('frameType');
 const manualControls = document.getElementById('manualControls');
 const pauseButton = document.getElementById('pauseButton');
-const frameDebugInfo = document.getElementById('frameDebugInfo');
-const frameDebugLog = document.getElementById('frameDebugLog');
-
-// フレームデバッグ機能
-let frameDebugEnabled = false;
-
-function toggleFrameDebug() {
-    frameDebugEnabled = !frameDebugEnabled;
-    frameDebugInfo.style.display = frameDebugEnabled ? 'block' : 'none';
-    if (frameDebugEnabled && isTransmitting) {
-        displayFrameDebugInfo();
-    }
-}
-
-function displayFrameDebugInfo() {
-    if (!frameDebugEnabled || !isTransmitting || qrFrames.length === 0) return;
-    
-    const frame = qrFrames[currentFrameIndex];
-    let debugText = `フレーム${currentFrameIndex + 1}/${qrFrames.length}\n`;
-    debugText += `タイプ: ${frame.type}\n`;
-    
-    if (frame.type === 'header') {
-        debugText += `データ: ${frame.data}\n`;
-    } else {
-        debugText += `シーケンス: ${frame.sequence}\n`;
-        debugText += `QRサイズ: ${Utils.getByteLength(frame.data)}バイト\n`;
-        debugText += `データ: ${frame.data.substring(0, 100)}...\n`;
-        
-        // Base64デコードしてみる
-        const parsed = QRFormat.parse(frame.data);
-        if (parsed && parsed.data) {
-            debugText += `デコード後: ${parsed.data.substring(0, 50)}...\n`;
-        }
-    }
-    
-    frameDebugLog.textContent = debugText;
-}
 
 // イベントリスナーの設定
 inputText.addEventListener('input', updateTextInfo);
@@ -150,16 +113,10 @@ async function generateQRFrames(text) {
     const maxDataSize = 600; // QRコードに含められる実データサイズ（Base64エンコード前）
     const chunks = Utils.splitData(text, maxDataSize);
     
-    console.log(`テキスト分割数: ${chunks.length}`);
-    chunks.forEach((chunk, i) => {
-        console.log(`チャンク${i+1}: ${Utils.getByteLength(chunk)}バイト`);
-    });
-    
     // ヘッダーQRコード生成
     // 総フレーム数 = ヘッダー(1) + データフレーム(chunks.length) = chunks.length + 1
     const totalFrameCount = chunks.length + 1;
     const headerData = QRFormat.createHeader(totalFrameCount, dataSize, dataHash);
-    console.log(`フレーム生成: ヘッダー1個 + データ${chunks.length}個 = 総計${totalFrameCount}フレーム`);
     frames.push({
         type: 'header',
         data: headerData
@@ -170,12 +127,6 @@ async function generateQRFrames(text) {
         const chunk = chunks[i];
         const crc = Utils.calculateCRC(chunk);
         const dataQR = QRFormat.createData(i + 1, chunk, crc);
-        
-        console.log(`データフレーム${i + 1}: データサイズ${Utils.getByteLength(chunk)}バイト, QRサイズ${Utils.getByteLength(dataQR)}バイト`);
-        if (i === chunks.length - 1) {
-            console.log(`最後のフレーム詳細: seq=${i + 1}, data="${chunk.substring(0, 50)}...", crc=${crc}`);
-            console.log(`最後のフレーム完全QRデータ: ${dataQR}`);
-        }
         
         frames.push({
             type: 'data',
@@ -206,43 +157,23 @@ function displayCurrentFrame() {
         frameType.textContent = `データフレーム ${frame.sequence}`;
     }
     
-    // フレームデバッグ情報更新
-    displayFrameDebugInfo();
-    
     // QRコード生成と表示
     qrDisplay.innerHTML = '';
     
-    // デバッグ: ライブラリ確認
     if (typeof QRCode === 'undefined') {
         console.error('QRCodeライブラリが読み込まれていません');
         alert('QRCodeライブラリの読み込みエラー');
         return;
     }
     
-    // QRCode.jsライブラリを使用
     const qrContainer = document.createElement('div');
     qrDisplay.appendChild(qrContainer);
-    
-    // デバッグ: フレームデータサイズを表示
-    const frameByteSize = Utils.getByteLength(frame.data);
-    console.log(`フレーム${currentFrameIndex + 1} 総サイズ: ${frameByteSize}バイト（ASCII文字のみ）`);
-    console.log(`フレームデータ: ${frame.data.substring(0, 100)}...`);
-    
-    // データフレームの場合、詳細なサイズ情報を表示
-    if (frame.type === 'data') {
-        const parsed = QRFormat.parse(frame.data);
-        if (parsed && parsed.data) {
-            const decodedDataSize = Utils.getByteLength(parsed.data);
-            console.log(`  - デコード後データ: ${decodedDataSize}バイト`);
-            console.log(`  - Base64エンコード比: ${(frameByteSize / decodedDataSize).toFixed(2)}倍`);
-        }
-    }
     
     const qrcode = new QRCode(qrContainer, {
         text: frame.data,
         width: 300,
         height: 300,
-        correctLevel: QRCode.CorrectLevel.L  // エラー訂正レベルをLに下げて容量を増やす
+        correctLevel: QRCode.CorrectLevel.L
     });
 }
 
@@ -306,11 +237,7 @@ function displayNextFrame() {
     
     // 次のフレームへ（一時停止中でなければ）
     if (!isPaused) {
-        const prevIndex = currentFrameIndex;
         currentFrameIndex = (currentFrameIndex + 1) % qrFrames.length;
-        console.log(`自動送り: フレーム${prevIndex + 1} → フレーム${currentFrameIndex + 1}`);
-    } else {
-        console.log(`一時停止中: フレーム${currentFrameIndex + 1}に留まる`);
     }
 }
 
@@ -340,14 +267,6 @@ function nextFrame() {
 function togglePause() {
     isPaused = !isPaused;
     pauseButton.textContent = isPaused ? '再開' : '一時停止';
-    
-    if (!isPaused && isTransmitting) {
-        // 再開時は次のフレームに進む
-        console.log(`再開: フレーム${currentFrameIndex + 1}から自動送り再開`);
-        // 注: インターバルタイマーが自動的に次のフレームに進むので、ここではインデックスを変更しない
-    } else if (isPaused) {
-        console.log(`一時停止: フレーム${currentFrameIndex + 1}で停止`);
-    }
 }
 
 // フレームジャンプ機能
@@ -360,7 +279,6 @@ function jumpToFrame(frameNumber) {
     
     currentFrameIndex = Math.max(0, Math.min(frameNumber - 1, qrFrames.length - 1));
     displayCurrentFrame();
-    console.log(`フレーム${frameNumber}にジャンプ`);
 }
 
 function jumpToLastFrame() {
@@ -398,7 +316,6 @@ window.togglePause = togglePause;
 window.displayCurrentFrame = displayCurrentFrame;
 window.jumpToFrame = jumpToFrame;
 window.jumpToLastFrame = jumpToLastFrame;
-window.toggleFrameDebug = toggleFrameDebug;
 
 // 送信開始時にWake Lockを取得
 window.addEventListener('load', () => {
