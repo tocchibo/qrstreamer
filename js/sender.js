@@ -93,8 +93,16 @@ async function generateQRFrames(text) {
     const dataSize = Utils.getByteLength(text);
     
     // データ分割（QRコード容量を考慮）
-    const maxDataSize = 800; // QRコードに含められる実データサイズ
+    // プロトコルオーバーヘッド: "DAT|seq:X|data:|crc:12345678|b64:1" = 約40バイト
+    // Base64エンコード後は元の1.33倍のサイズになる
+    // QRコード（エラー訂正レベルL）は約2900バイトまで格納可能
+    const maxDataSize = 600; // QRコードに含められる実データサイズ（Base64エンコード前）
     const chunks = Utils.splitData(text, maxDataSize);
+    
+    console.log(`テキスト分割数: ${chunks.length}`);
+    chunks.forEach((chunk, i) => {
+        console.log(`チャンク${i+1}: ${Utils.getByteLength(chunk)}バイト`);
+    });
     
     // ヘッダーQRコード生成
     const headerData = QRFormat.createHeader(chunks.length + 1, dataSize, dataHash);
@@ -144,11 +152,26 @@ function displayNextFrame() {
     const qrContainer = document.createElement('div');
     qrDisplay.appendChild(qrContainer);
     
+    // デバッグ: フレームデータサイズを表示
+    const frameByteSize = Utils.getByteLength(frame.data);
+    console.log(`フレーム${currentFrameIndex + 1} 総サイズ: ${frameByteSize}バイト（ASCII文字のみ）`);
+    console.log(`フレームデータ: ${frame.data.substring(0, 100)}...`);
+    
+    // データフレームの場合、詳細なサイズ情報を表示
+    if (frame.type === 'data') {
+        const parsed = QRFormat.parse(frame.data);
+        if (parsed && parsed.data) {
+            const decodedDataSize = Utils.getByteLength(parsed.data);
+            console.log(`  - デコード後データ: ${decodedDataSize}バイト`);
+            console.log(`  - Base64エンコード比: ${(frameByteSize / decodedDataSize).toFixed(2)}倍`);
+        }
+    }
+    
     const qrcode = new QRCode(qrContainer, {
         text: frame.data,
         width: 300,
         height: 300,
-        correctLevel: QRCode.CorrectLevel.M
+        correctLevel: QRCode.CorrectLevel.L  // エラー訂正レベルをLに下げて容量を増やす
     });
     
     // 次のフレームへ

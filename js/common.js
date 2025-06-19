@@ -18,7 +18,9 @@ const QRFormat = {
 
     // データQRコード生成
     createData: function(sequence, data, crc) {
-        return `${QR_TYPE.DATA}|seq:${sequence}|data:${data}|crc:${crc}`;
+        // データをBase64エンコード
+        const encodedData = btoa(unescape(encodeURIComponent(data)));
+        return `${QR_TYPE.DATA}|seq:${sequence}|data:${encodedData}|crc:${crc}|b64:1`;
     },
 
     // QRコードパース
@@ -49,7 +51,7 @@ const QRFormat = {
 
             return result;
         } else if (type === QR_TYPE.DATA) {
-            if (parts.length !== 4) return null;
+            if (parts.length < 4) return null;
 
             const result = {
                 type: type
@@ -61,19 +63,42 @@ const QRFormat = {
                 result.sequence = parseInt(seqPart[1]);
             }
 
+            // Base64フラグをチェック
+            let isBase64 = false;
+            for (let i = 2; i < parts.length; i++) {
+                if (parts[i] === 'b64:1') {
+                    isBase64 = true;
+                    break;
+                }
+            }
+
             // data:XXX を解析（データ部分は':'を含む可能性があるため特別処理）
             const dataPrefix = 'data:';
             const dataStartIndex = qrData.indexOf(dataPrefix, parts[0].length + parts[1].length);
             if (dataStartIndex !== -1) {
                 const dataStart = dataStartIndex + dataPrefix.length;
-                const lastPipe = qrData.lastIndexOf('|');
-                result.data = qrData.substring(dataStart, lastPipe);
+                // crcとb64フラグを除外するため、最後の2つのパイプまで取得
+                let dataEnd = qrData.lastIndexOf('|crc:');
+                if (dataEnd === -1) dataEnd = qrData.length;
+                const encodedData = qrData.substring(dataStart, dataEnd);
+                
+                // Base64デコード
+                if (isBase64) {
+                    try {
+                        result.data = decodeURIComponent(escape(atob(encodedData)));
+                    } catch (e) {
+                        console.error('Base64デコードエラー:', e);
+                        result.data = encodedData;
+                    }
+                } else {
+                    result.data = encodedData;
+                }
             }
 
             // crc:XXX を解析
-            const crcPart = parts[parts.length - 1].split(':');
-            if (crcPart[0] === 'crc') {
-                result.crc = crcPart[1];
+            const crcMatch = qrData.match(/\|crc:([a-f0-9]+)/);
+            if (crcMatch) {
+                result.crc = crcMatch[1];
             }
 
             return result;
@@ -107,8 +132,8 @@ const Utils = {
         let index = 0;
         
         while (index < data.length) {
-            // 次のチャンクの終了位置を計算
-            let endIndex = Math.min(index + maxChunkSize, data.length);
+            // 初期の終了位置を文字数ベースで設定（日本語は3バイトと仮定）
+            let endIndex = Math.min(index + Math.floor(maxChunkSize / 3), data.length);
             
             // UTF-8の境界を考慮して調整
             while (endIndex > index) {
