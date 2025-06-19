@@ -18,14 +18,13 @@ const cameraContainer = document.getElementById('cameraContainer');
 const progressContainer = document.getElementById('progressContainer');
 const receivedCount = document.getElementById('receivedCount');
 const totalCount = document.getElementById('totalCount');
-const progressPercent = document.getElementById('progressPercent');
-const progressFill = document.getElementById('progressFill');
-const missingFrames = document.getElementById('missingFrames');
+const progressFillInline = document.getElementById('progressFillInline');
 const frameStatus = document.getElementById('frameStatus');
 const resultSection = document.getElementById('resultSection');
 const receivedText = document.getElementById('receivedText');
 const errorMessage = document.getElementById('errorMessage');
 const scanStatus = document.getElementById('scanStatus');
+const readyMessage = document.getElementById('readyMessage');
 
 // スキャン開始
 async function startScanning() {
@@ -54,9 +53,8 @@ async function startScanning() {
             startButton.style.display = 'none';
             stopButton.style.display = 'inline-block';
             cameraContainer.style.display = 'block';
-            progressContainer.style.display = 'block';
             errorMessage.style.display = 'none';
-            updateScanStatus('QRコードをスキャン中...');
+            updateScanStatus('QRコードをスキャン');
             
             // スキャン開始
             scanning = true;
@@ -91,6 +89,8 @@ function stopScanning() {
     startButton.style.display = 'inline-block';
     stopButton.style.display = 'none';
     cameraContainer.style.display = 'none';
+    progressContainer.style.display = 'none';
+    readyMessage.style.display = 'none';
     
     // Wake Lock解放
     releaseWakeLock();
@@ -133,7 +133,13 @@ function processQRCode(data) {
             headerInfo = parsed;
             receivedFrames.clear();
             expectedFrames = parsed.totalFrames - 1; // ヘッダーを除く
+            
+            // 準備完了メッセージを表示
+            readyMessage.style.display = 'block';
+            progressContainer.style.display = 'block';
+            errorMessage.style.display = 'none'; // エラーメッセージをクリア
             updateProgress();
+            updateScanStatus('スキャン中...');
         }
     } else if (parsed.type === QR_TYPE.DATA) {
         // データフレーム処理
@@ -152,7 +158,14 @@ function processQRCode(data) {
         // フレーム保存（重複は上書き）
         if (!receivedFrames.has(parsed.sequence)) {
             receivedFrames.set(parsed.sequence, parsed.data);
-            updateScanStatus(`フレーム ${parsed.sequence} 受信完了`);
+            
+            // 準備完了メッセージを非表示
+            if (readyMessage.style.display !== 'none') {
+                readyMessage.style.display = 'none';
+            }
+            
+            errorMessage.style.display = 'none'; // エラーメッセージをクリア
+            updateScanStatus('スキャン中...');
             updateProgress();
             
             // 完了チェック
@@ -160,7 +173,7 @@ function processQRCode(data) {
                 onReceiveComplete();
             }
         } else {
-            updateScanStatus('QRコードをスキャン中...');
+            updateScanStatus('スキャン中...');
         }
     }
 }
@@ -173,8 +186,7 @@ function updateProgress() {
     
     receivedCount.textContent = received;
     totalCount.textContent = total;
-    progressPercent.textContent = percent;
-    progressFill.style.width = percent + '%';
+    progressFillInline.style.width = percent + '%';
     
     // フレーム状況の可視化
     if (total > 0) {
@@ -200,25 +212,6 @@ function updateProgress() {
             
             frameStatus.appendChild(indicator);
         }
-    }
-    
-    // 未受信フレーム表示
-    if (received < total) {
-        const missing = [];
-        for (let i = 1; i <= total; i++) {
-            if (!receivedFrames.has(i)) {
-                missing.push(i);
-            }
-        }
-        if (missing.length > 0 && missing.length <= 10) {
-            missingFrames.textContent = '未受信: ' + missing.join(', ');
-        } else if (missing.length > 10) {
-            missingFrames.textContent = `未受信: ${missing.length}フレーム`;
-        } else {
-            missingFrames.textContent = '';
-        }
-    } else {
-        missingFrames.textContent = '';
     }
 }
 
@@ -249,6 +242,7 @@ async function onReceiveComplete() {
     progressContainer.style.display = 'none';
     resultSection.style.display = 'block';
     receivedText.textContent = reconstructedData;
+    errorMessage.style.display = 'none'; // エラーメッセージをクリア
 }
 
 // テキストをクリップボードにコピー
@@ -307,6 +301,7 @@ function resetReceiver() {
     
     resultSection.style.display = 'none';
     progressContainer.style.display = 'none';
+    readyMessage.style.display = 'none';
     errorMessage.style.display = 'none';
     
     updateProgress();

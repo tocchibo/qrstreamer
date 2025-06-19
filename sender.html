@@ -38,6 +38,13 @@
             <p>QRコードがここに表示されます</p>
         </div>
         
+        <div class="start-transmission" id="startTransmissionSection" style="display: none;">
+            <div class="info">
+                受信側の準備ができたら
+            </div>
+            <button id="startLoopButton" onclick="startLoop()">データ送信を開始</button>
+        </div>
+        
         <div class="frame-info-large" id="frameInfoLarge" style="display: none;">
             <h2><span id="currentFrameLarge">1</span> / <span id="totalFramesLarge">1</span></h2>
             <div class="frame-type" id="frameType">データフレーム</div>

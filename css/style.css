@@ -145,6 +145,52 @@ button.stop {
     margin: 20px 0;
 }
 
+.progress-info {
+    text-align: center;
+    font-size: 24px;
+    font-weight: 600;
+    margin-bottom: 15px;
+}
+
+.progress-bar-inline {
+    display: inline-block;
+    width: 150px;
+    height: 4px;
+    background-color: var(--border-color);
+    margin-left: 15px;
+    vertical-align: middle;
+    position: relative;
+}
+
+.progress-fill-inline {
+    position: absolute;
+    height: 100%;
+    background-color: var(--success-color);
+    transition: width 0.3s ease;
+}
+
+/* 準備完了メッセージ */
+.ready-message {
+    text-align: center;
+    margin: 20px 0;
+    animation: fadeIn 0.3s ease;
+}
+
+.ready-message .success {
+    font-size: 24px;
+    margin-bottom: 15px;
+}
+
+.ready-message .info {
+    font-size: 18px;
+    line-height: 1.5;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
 .progress-bar {
     width: 100%;
     height: 20px;
@@ -172,6 +218,17 @@ button.stop {
     border-radius: 4px;
     margin: 15px 0;
     border: 1px solid var(--border-color);
+}
+
+.start-transmission {
+    text-align: center;
+    margin: 20px 0;
+}
+
+.start-transmission button {
+    margin-top: 10px;
+    padding: 15px 30px;
+    font-size: 18px;
 }
 
 .camera-section {
@@ -290,20 +347,20 @@ button.stop {
 .frame-status {
     display: flex;
     flex-wrap: wrap;
-    gap: 5px;
-    margin: 20px 0;
+    gap: 3px;
+    margin: 10px 0;
     justify-content: center;
 }
 
 .frame-indicator {
-    width: 30px;
-    height: 30px;
-    border: 2px solid #bdc3c7;
-    border-radius: 4px;
+    width: 20px;
+    height: 20px;
+    border: 1px solid var(--border-color);
+    border-radius: 2px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 12px;
+    font-size: 10px;
     font-weight: bold;
 }
 

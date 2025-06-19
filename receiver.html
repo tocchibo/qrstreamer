@@ -29,16 +29,21 @@
             </div>
         </div>
         
-        <div class="progress-container" id="progressContainer" style="display: none;">
+        <div class="ready-message" id="readyMessage" style="display: none;">
+            <div class="success">✓ 準備完了</div>
             <div class="info">
-                進捗: <span id="receivedCount">0</span> / <span id="totalCount">?</span> 
-                (<span id="progressPercent">0</span>%)
+                送信画面の「データ送信を開始」を<br>押してください
             </div>
-            <div class="progress-bar">
-                <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
+        </div>
+        
+        <div class="progress-container" id="progressContainer" style="display: none;">
+            <div class="progress-info">
+                <span id="receivedCount">0</span>/<span id="totalCount">?</span>
+                <span class="progress-bar-inline">
+                    <span class="progress-fill-inline" id="progressFillInline" style="width: 0%;"></span>
+                </span>
             </div>
             <div class="frame-status" id="frameStatus"></div>
-            <div class="progress-text" id="missingFrames"></div>
         </div>
         
         <div id="resultSection" style="display: none;">
