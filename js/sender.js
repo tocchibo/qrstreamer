@@ -14,6 +14,7 @@ const intervalSlider = document.getElementById('intervalSlider');
 const intervalValue = document.getElementById('intervalValue');
 const startButton = document.getElementById('startButton');
 const stopButton = document.getElementById('stopButton');
+const newTransmissionButton = document.getElementById('newTransmissionButton');
 const qrDisplay = document.getElementById('qrDisplay');
 const frameInfo = document.getElementById('frameInfo');
 const currentFrame = document.getElementById('currentFrame');
@@ -67,6 +68,7 @@ async function startTransmission() {
         // UI更新（ヘッダーQRのみ表示）
         startButton.style.display = 'none';
         stopButton.style.display = 'inline-block';
+        newTransmissionButton.style.display = 'inline-block';
         startTransmissionSection.style.display = 'block';
         
         // ヘッダーQRコードのみ表示
@@ -138,6 +140,7 @@ function stopTransmission() {
     // UI更新
     startButton.style.display = 'inline-block';
     stopButton.style.display = 'none';
+    newTransmissionButton.style.display = 'none';
     frameInfo.style.display = 'none';
     frameInfoLarge.style.display = 'none';
     manualControls.style.display = 'none';
@@ -145,6 +148,19 @@ function stopTransmission() {
     qrDisplay.innerHTML = '<p>QRコードがここに表示されます</p>';
     isPaused = false;
     pauseButton.textContent = '一時停止';
+}
+
+// 新規送信
+function newTransmission() {
+    // 現在の送信を停止
+    stopTransmission();
+    
+    // テキストエリアをクリアしてフォーカス
+    inputText.value = '';
+    inputText.focus();
+    
+    // テキスト情報を更新
+    updateTextInfo();
 }
 
 // QRコードフレームの生成
@@ -363,6 +379,7 @@ window.togglePause = togglePause;
 window.displayCurrentFrame = displayCurrentFrame;
 window.jumpToFrame = jumpToFrame;
 window.jumpToLastFrame = jumpToLastFrame;
+window.newTransmission = newTransmission;
 
 // 送信開始時にWake Lockを取得
 window.addEventListener('load', () => {
