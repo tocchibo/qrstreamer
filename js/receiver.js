@@ -21,6 +21,7 @@ const totalCount = document.getElementById('totalCount');
 const progressPercent = document.getElementById('progressPercent');
 const progressFill = document.getElementById('progressFill');
 const missingFrames = document.getElementById('missingFrames');
+const frameStatus = document.getElementById('frameStatus');
 const resultSection = document.getElementById('resultSection');
 const receivedText = document.getElementById('receivedText');
 const errorMessage = document.getElementById('errorMessage');
@@ -124,36 +125,44 @@ function processQRCode(data) {
     
     if (parsed.type === QR_TYPE.HEADER) {
         // ヘッダー処理
+        console.log('ヘッダー受信:', parsed);
         if (!headerInfo || headerInfo.dataHash !== parsed.dataHash) {
             // 新しい転送セッション
             headerInfo = parsed;
             receivedFrames.clear();
             expectedFrames = parsed.totalFrames - 1; // ヘッダーを除く
+            console.log(`新しいセッション開始: 総フレーム数=${parsed.totalFrames}（データフレーム数=${expectedFrames}）`);
             updateProgress();
         }
     } else if (parsed.type === QR_TYPE.DATA) {
         // データフレーム処理
         if (!headerInfo) {
-            console.warn('ヘッダー未受信のデータフレーム');
+            console.warn('ヘッダー未受信のデータフレーム:', parsed.sequence);
             return;
         }
+        
+        console.log(`データフレーム受信: seq=${parsed.sequence}, size=${Utils.getByteLength(parsed.data)}バイト`);
         
         // CRCチェック
         const calculatedCRC = Utils.calculateCRC(parsed.data);
         if (calculatedCRC !== parsed.crc) {
-            console.error('CRCエラー:', parsed.sequence);
+            console.error(`CRCエラー: seq=${parsed.sequence}, expected=${parsed.crc}, calculated=${calculatedCRC}`);
             return;
         }
         
         // フレーム保存（重複は上書き）
         if (!receivedFrames.has(parsed.sequence)) {
             receivedFrames.set(parsed.sequence, parsed.data);
+            console.log(`フレーム${parsed.sequence}を保存 (${receivedFrames.size}/${expectedFrames})`);
             updateProgress();
             
             // 完了チェック
             if (receivedFrames.size === expectedFrames) {
+                console.log('全フレーム受信完了！');
                 onReceiveComplete();
             }
+        } else {
+            console.log(`フレーム${parsed.sequence}は既に受信済み`);
         }
     }
 }
@@ -168,6 +177,32 @@ function updateProgress() {
     totalCount.textContent = total;
     progressPercent.textContent = percent;
     progressFill.style.width = percent + '%';
+    
+    // フレーム状況の可視化
+    if (total > 0) {
+        frameStatus.innerHTML = '';
+        
+        // ヘッダーフレーム
+        const headerIndicator = document.createElement('div');
+        headerIndicator.className = 'frame-indicator header';
+        headerIndicator.textContent = 'H';
+        headerIndicator.title = 'ヘッダーフレーム';
+        frameStatus.appendChild(headerIndicator);
+        
+        // データフレーム
+        for (let i = 1; i <= total; i++) {
+            const indicator = document.createElement('div');
+            indicator.className = 'frame-indicator';
+            indicator.textContent = i;
+            indicator.title = `フレーム ${i}`;
+            
+            if (receivedFrames.has(i)) {
+                indicator.classList.add('received');
+            }
+            
+            frameStatus.appendChild(indicator);
+        }
+    }
     
     // 未受信フレーム表示
     if (received < total) {

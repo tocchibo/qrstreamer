@@ -38,6 +38,17 @@
             <p>QRコードがここに表示されます</p>
         </div>
         
+        <div class="frame-info-large" id="frameInfoLarge" style="display: none;">
+            <h2><span id="currentFrameLarge">1</span> / <span id="totalFramesLarge">1</span></h2>
+            <div class="frame-type" id="frameType">データフレーム</div>
+        </div>
+        
+        <div class="manual-controls" id="manualControls" style="display: none;">
+            <button onclick="previousFrame()">◀ 前へ</button>
+            <button onclick="nextFrame()">次へ ▶</button>
+            <button id="pauseButton" onclick="togglePause()">一時停止</button>
+        </div>
+        
         <div class="info" id="frameInfo" style="display: none;">
             フレーム: <span id="currentFrame">1</span> / <span id="totalFrames">1</span>
         </div>

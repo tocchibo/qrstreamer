@@ -202,6 +202,72 @@ button.stop:hover {
     background-color: #2980b9;
 }
 
+/* フレーム情報（大きな表示） */
+.frame-info-large {
+    text-align: center;
+    margin: 20px 0;
+    background-color: #ecf0f1;
+    padding: 20px;
+    border-radius: 8px;
+}
+
+.frame-info-large h2 {
+    font-size: 48px;
+    margin: 0;
+    color: #2c3e50;
+}
+
+.frame-type {
+    font-size: 18px;
+    color: #7f8c8d;
+    margin-top: 10px;
+}
+
+/* 手動コントロール */
+.manual-controls {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin: 20px 0;
+}
+
+.manual-controls button {
+    min-width: 100px;
+}
+
+/* 受信フレーム状態表示 */
+.frame-status {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+    margin: 20px 0;
+    justify-content: center;
+}
+
+.frame-indicator {
+    width: 30px;
+    height: 30px;
+    border: 2px solid #bdc3c7;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    font-weight: bold;
+}
+
+.frame-indicator.received {
+    background-color: #2ecc71;
+    border-color: #27ae60;
+    color: white;
+}
+
+.frame-indicator.header {
+    background-color: #3498db;
+    border-color: #2980b9;
+    color: white;
+}
+
 /* レスポンシブ対応 */
 @media (max-width: 600px) {
     body {
@@ -220,5 +286,18 @@ button.stop:hover {
     .menu-links a {
         width: 100%;
         text-align: center;
+    }
+    
+    .frame-info-large h2 {
+        font-size: 36px;
+    }
+    
+    .manual-controls {
+        flex-wrap: wrap;
+    }
+    
+    .manual-controls button {
+        min-width: 80px;
+        font-size: 14px;
     }
 }
