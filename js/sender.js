@@ -24,6 +24,43 @@ const totalFramesLarge = document.getElementById('totalFramesLarge');
 const frameType = document.getElementById('frameType');
 const manualControls = document.getElementById('manualControls');
 const pauseButton = document.getElementById('pauseButton');
+const frameDebugInfo = document.getElementById('frameDebugInfo');
+const frameDebugLog = document.getElementById('frameDebugLog');
+
+// フレームデバッグ機能
+let frameDebugEnabled = false;
+
+function toggleFrameDebug() {
+    frameDebugEnabled = !frameDebugEnabled;
+    frameDebugInfo.style.display = frameDebugEnabled ? 'block' : 'none';
+    if (frameDebugEnabled && isTransmitting) {
+        displayFrameDebugInfo();
+    }
+}
+
+function displayFrameDebugInfo() {
+    if (!frameDebugEnabled || !isTransmitting || qrFrames.length === 0) return;
+    
+    const frame = qrFrames[currentFrameIndex];
+    let debugText = `フレーム${currentFrameIndex + 1}/${qrFrames.length}\n`;
+    debugText += `タイプ: ${frame.type}\n`;
+    
+    if (frame.type === 'header') {
+        debugText += `データ: ${frame.data}\n`;
+    } else {
+        debugText += `シーケンス: ${frame.sequence}\n`;
+        debugText += `QRサイズ: ${Utils.getByteLength(frame.data)}バイト\n`;
+        debugText += `データ: ${frame.data.substring(0, 100)}...\n`;
+        
+        // Base64デコードしてみる
+        const parsed = QRFormat.parse(frame.data);
+        if (parsed && parsed.data) {
+            debugText += `デコード後: ${parsed.data.substring(0, 50)}...\n`;
+        }
+    }
+    
+    frameDebugLog.textContent = debugText;
+}
 
 // イベントリスナーの設定
 inputText.addEventListener('input', updateTextInfo);
@@ -119,7 +156,10 @@ async function generateQRFrames(text) {
     });
     
     // ヘッダーQRコード生成
-    const headerData = QRFormat.createHeader(chunks.length + 1, dataSize, dataHash);
+    // 総フレーム数 = ヘッダー(1) + データフレーム(chunks.length) = chunks.length + 1
+    const totalFrameCount = chunks.length + 1;
+    const headerData = QRFormat.createHeader(totalFrameCount, dataSize, dataHash);
+    console.log(`フレーム生成: ヘッダー1個 + データ${chunks.length}個 = 総計${totalFrameCount}フレーム`);
     frames.push({
         type: 'header',
         data: headerData
@@ -130,6 +170,11 @@ async function generateQRFrames(text) {
         const chunk = chunks[i];
         const crc = Utils.calculateCRC(chunk);
         const dataQR = QRFormat.createData(i + 1, chunk, crc);
+        
+        console.log(`データフレーム${i + 1}: データサイズ${Utils.getByteLength(chunk)}バイト, QRサイズ${Utils.getByteLength(dataQR)}バイト`);
+        if (i === chunks.length - 1) {
+            console.log(`最後のフレーム詳細: seq=${i + 1}, data="${chunk.substring(0, 50)}...", crc=${crc}`);
+        }
         
         frames.push({
             type: 'data',
@@ -159,6 +204,9 @@ function displayCurrentFrame() {
     } else {
         frameType.textContent = `データフレーム ${frame.sequence}`;
     }
+    
+    // フレームデバッグ情報更新
+    displayFrameDebugInfo();
     
     // QRコード生成と表示
     qrDisplay.innerHTML = '';
@@ -215,6 +263,9 @@ function displayNextFrame() {
     } else {
         frameType.textContent = `データフレーム ${frame.sequence}`;
     }
+    
+    // フレームデバッグ情報更新
+    displayFrameDebugInfo();
     
     // QRコード生成と表示
     qrDisplay.innerHTML = '';
@@ -298,6 +349,25 @@ function togglePause() {
     }
 }
 
+// フレームジャンプ機能
+function jumpToFrame(frameNumber) {
+    if (!isTransmitting || qrFrames.length === 0) return;
+    
+    // 一時停止して手動操作
+    isPaused = true;
+    pauseButton.textContent = '再開';
+    
+    currentFrameIndex = Math.max(0, Math.min(frameNumber - 1, qrFrames.length - 1));
+    displayCurrentFrame();
+    console.log(`フレーム${frameNumber}にジャンプ`);
+}
+
+function jumpToLastFrame() {
+    if (!isTransmitting || qrFrames.length === 0) return;
+    
+    jumpToFrame(qrFrames.length);
+}
+
 // Wake Lock API（画面スリープ防止）
 let wakeLock = null;
 
@@ -325,6 +395,9 @@ window.previousFrame = previousFrame;
 window.nextFrame = nextFrame;
 window.togglePause = togglePause;
 window.displayCurrentFrame = displayCurrentFrame;
+window.jumpToFrame = jumpToFrame;
+window.jumpToLastFrame = jumpToLastFrame;
+window.toggleFrameDebug = toggleFrameDebug;
 
 // 送信開始時にWake Lockを取得
 window.addEventListener('load', () => {

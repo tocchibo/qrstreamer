@@ -25,6 +25,27 @@ const frameStatus = document.getElementById('frameStatus');
 const resultSection = document.getElementById('resultSection');
 const receivedText = document.getElementById('receivedText');
 const errorMessage = document.getElementById('errorMessage');
+const debugInfo = document.getElementById('debugInfo');
+const debugLog = document.getElementById('debugLog');
+
+// デバッグ機能
+let debugEnabled = false;
+function debugPrint(message) {
+    console.log(message);
+    if (debugEnabled && debugLog) {
+        const timestamp = new Date().toLocaleTimeString();
+        debugLog.innerHTML += `[${timestamp}] ${message}\n`;
+        debugLog.scrollTop = debugLog.scrollHeight;
+    }
+}
+
+function toggleDebug() {
+    debugEnabled = !debugEnabled;
+    debugInfo.style.display = debugEnabled ? 'block' : 'none';
+    if (debugEnabled) {
+        debugPrint('デバッグモード開始');
+    }
+}
 
 // スキャン開始
 async function startScanning() {
@@ -116,53 +137,59 @@ function scanQRCode() {
 
 // QRコード処理
 function processQRCode(data) {
+    debugPrint(`QRコード読み取り: ${data.substring(0, 50)}...`);
     const parsed = QRFormat.parse(data);
     
     if (!parsed) {
-        console.error('無効なQRコードフォーマット:', data);
+        debugPrint(`無効なQRコードフォーマット: ${data}`);
+        showError('無効なQRコードです');
         return;
     }
     
     if (parsed.type === QR_TYPE.HEADER) {
         // ヘッダー処理
-        console.log('ヘッダー受信:', parsed);
+        debugPrint(`ヘッダー受信: totalFrames=${parsed.totalFrames}, dataSize=${parsed.dataSize}, hash=${parsed.dataHash}`);
         if (!headerInfo || headerInfo.dataHash !== parsed.dataHash) {
             // 新しい転送セッション
             headerInfo = parsed;
             receivedFrames.clear();
             expectedFrames = parsed.totalFrames - 1; // ヘッダーを除く
-            console.log(`新しいセッション開始: 総フレーム数=${parsed.totalFrames}（データフレーム数=${expectedFrames}）`);
+            debugPrint(`新セッション開始: 総フレーム数=${parsed.totalFrames}（データフレーム数=${expectedFrames}）`);
             updateProgress();
+        } else {
+            debugPrint('同じヘッダーを再受信（無視）');
         }
     } else if (parsed.type === QR_TYPE.DATA) {
         // データフレーム処理
         if (!headerInfo) {
-            console.warn('ヘッダー未受信のデータフレーム:', parsed.sequence);
+            debugPrint(`ヘッダー未受信のデータフレーム: seq=${parsed.sequence}`);
+            showError('ヘッダーが受信されていません');
             return;
         }
         
-        console.log(`データフレーム受信: seq=${parsed.sequence}, size=${Utils.getByteLength(parsed.data)}バイト`);
+        debugPrint(`データフレーム受信: seq=${parsed.sequence}, size=${Utils.getByteLength(parsed.data)}バイト`);
         
         // CRCチェック
         const calculatedCRC = Utils.calculateCRC(parsed.data);
         if (calculatedCRC !== parsed.crc) {
-            console.error(`CRCエラー: seq=${parsed.sequence}, expected=${parsed.crc}, calculated=${calculatedCRC}`);
+            debugPrint(`CRCエラー: seq=${parsed.sequence}, expected=${parsed.crc}, calculated=${calculatedCRC}`);
+            showError(`フレーム${parsed.sequence}のデータエラー`);
             return;
         }
         
         // フレーム保存（重複は上書き）
         if (!receivedFrames.has(parsed.sequence)) {
             receivedFrames.set(parsed.sequence, parsed.data);
-            console.log(`フレーム${parsed.sequence}を保存 (${receivedFrames.size}/${expectedFrames})`);
+            debugPrint(`フレーム${parsed.sequence}を保存 (${receivedFrames.size}/${expectedFrames})`);
             updateProgress();
             
             // 完了チェック
             if (receivedFrames.size === expectedFrames) {
-                console.log('全フレーム受信完了！');
+                debugPrint('全フレーム受信完了！');
                 onReceiveComplete();
             }
         } else {
-            console.log(`フレーム${parsed.sequence}は既に受信済み`);
+            debugPrint(`フレーム${parsed.sequence}は既に受信済み`);
         }
     }
 }
@@ -291,10 +318,10 @@ async function requestWakeLock() {
     try {
         if ('wakeLock' in navigator) {
             wakeLock = await navigator.wakeLock.request('screen');
-            console.log('Wake Lock取得成功');
+            debugPrint('Wake Lock取得成功');
         }
     } catch (err) {
-        console.log('Wake Lock取得失敗:', err);
+        debugPrint('Wake Lock取得失敗:' + err);
     }
 }
 
@@ -302,6 +329,9 @@ async function releaseWakeLock() {
     if (wakeLock !== null) {
         await wakeLock.release();
         wakeLock = null;
-        console.log('Wake Lock解放');
+        debugPrint('Wake Lock解放');
     }
 }
+
+// グローバル関数として登録
+window.toggleDebug = toggleDebug;

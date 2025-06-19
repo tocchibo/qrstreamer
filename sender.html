@@ -47,10 +47,21 @@
             <button onclick="previousFrame()">◀ 前へ</button>
             <button onclick="nextFrame()">次へ ▶</button>
             <button id="pauseButton" onclick="togglePause()">一時停止</button>
+            <button onclick="jumpToFrame(1)">最初</button>
+            <button onclick="jumpToLastFrame()">最後</button>
         </div>
         
         <div class="info" id="frameInfo" style="display: none;">
             フレーム: <span id="currentFrame">1</span> / <span id="totalFrames">1</span>
+        </div>
+        
+        <div id="frameDebugInfo" class="info" style="display: none; max-height: 150px; overflow-y: auto; font-size: 12px; white-space: pre-wrap;">
+            <strong>フレーム詳細:</strong><br>
+            <div id="frameDebugLog"></div>
+        </div>
+        
+        <div style="text-align: center; margin-top: 10px;">
+            <button onclick="toggleFrameDebug()">フレーム詳細表示/非表示</button>
         </div>
         
         <div style="text-align: center; margin-top: 20px;">
