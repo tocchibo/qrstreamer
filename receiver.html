@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QRコード受信 - QR Streamer</title>
+    <link rel="stylesheet" href="css/style.css">
+    
+    <!-- 外部ライブラリ（CDN） -->
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/js-sha256@0.11.0/src/sha256.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/crc-32@1.2.2/crc32.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>QRコード受信</h1>
+        
+        <div class="camera-section">
+            <div class="camera-preview" id="cameraContainer" style="display: none;">
+                <video id="video" autoplay playsinline></video>
+                <canvas id="canvas" style="display: none;"></canvas>
+                <div class="camera-overlay"></div>
+            </div>
+            
+            <div style="text-align: center; margin: 20px 0;">
+                <button id="startButton" onclick="startScanning()">スキャン開始</button>
+                <button id="stopButton" class="stop" onclick="stopScanning()" style="display: none;">停止</button>
+            </div>
+        </div>
+        
+        <div class="progress-container" id="progressContainer" style="display: none;">
+            <div class="info">
+                進捗: <span id="receivedCount">0</span> / <span id="totalCount">?</span> 
+                (<span id="progressPercent">0</span>%)
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progressFill" style="width: 0%;"></div>
+            </div>
+            <div class="progress-text" id="missingFrames"></div>
+        </div>
+        
+        <div id="resultSection" style="display: none;">
+            <div class="success">受信完了！</div>
+            <div class="received-text" id="receivedText"></div>
+            <div style="text-align: center; margin-top: 10px;">
+                <button onclick="copyToClipboard()">テキストをコピー</button>
+                <button onclick="resetReceiver()">新規受信</button>
+            </div>
+        </div>
+        
+        <div id="errorMessage" class="error" style="display: none;"></div>
+        
+        <div style="text-align: center; margin-top: 20px;">
+            <a href="index.html">トップページに戻る</a>
+        </div>
+    </div>
+    
+    <!-- 共通処理とアプリ固有処理 -->
+    <script src="js/common.js"></script>
+    <script src="js/receiver.js"></script>
+</body>
+</html>

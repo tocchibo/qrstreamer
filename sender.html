@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QRコード送信 - QR Streamer</title>
+    <link rel="stylesheet" href="css/style.css">
+    
+    <!-- 外部ライブラリ（CDN） -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/js-sha256@0.11.0/src/sha256.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/crc-32@1.2.2/crc32.min.js"></script>
+</head>
+<body>
+    <div class="container">
+        <h1>QRコード送信</h1>
+        
+        <div class="input-section">
+            <textarea id="inputText" placeholder="送信するテキストを入力してください"></textarea>
+            <div class="info">
+                文字数: <span id="charCount">0</span> / バイト数: <span id="byteCount">0</span>
+            </div>
+        </div>
+        
+        <div class="control-section">
+            <label for="intervalSlider">
+                表示間隔: <span id="intervalValue">1000</span>ms
+            </label>
+            <input type="range" id="intervalSlider" min="500" max="3000" value="1000" step="100">
+            
+            <div style="text-align: center; margin-top: 20px;">
+                <button id="startButton" onclick="startTransmission()">送信開始</button>
+                <button id="stopButton" class="stop" onclick="stopTransmission()" style="display: none;">停止</button>
+            </div>
+        </div>
+        
+        <div class="qr-display" id="qrDisplay">
+            <p>QRコードがここに表示されます</p>
+        </div>
+        
+        <div class="info" id="frameInfo" style="display: none;">
+            フレーム: <span id="currentFrame">1</span> / <span id="totalFrames">1</span>
+        </div>
+        
+        <div style="text-align: center; margin-top: 20px;">
+            <a href="index.html">トップページに戻る</a>
+        </div>
+    </div>
+    
+    <!-- 共通処理とアプリ固有処理 -->
+    <script src="js/common.js"></script>
+    <script src="js/sender.js"></script>
+</body>
+</html>
