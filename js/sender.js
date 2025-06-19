@@ -211,13 +211,13 @@ function displayCurrentFrame() {
     const frame = qrFrames[currentFrameIndex];
     
     // フレーム情報更新
-    currentFrame.textContent = currentFrameIndex + 1;
-    currentFrameLarge.textContent = currentFrameIndex + 1;
-    
-    // フレームタイプ表示
     if (frame.type === 'header') {
+        currentFrame.textContent = 'H';
+        currentFrameLarge.textContent = 'H';
         frameType.textContent = 'ヘッダーフレーム';
     } else {
+        currentFrame.textContent = frame.sequence;
+        currentFrameLarge.textContent = frame.sequence;
         frameType.textContent = `データフレーム ${frame.sequence}`;
     }
     
@@ -250,13 +250,13 @@ function displayNextFrame() {
     const frame = qrFrames[currentFrameIndex];
     
     // フレーム情報更新
-    currentFrame.textContent = currentFrameIndex + 1;
-    currentFrameLarge.textContent = currentFrameIndex + 1;
-    
-    // フレームタイプ表示
     if (frame.type === 'header') {
+        currentFrame.textContent = 'H';
+        currentFrameLarge.textContent = 'H';
         frameType.textContent = 'ヘッダーフレーム';
     } else {
+        currentFrame.textContent = frame.sequence;
+        currentFrameLarge.textContent = frame.sequence;
         frameType.textContent = `データフレーム ${frame.sequence}`;
     }
     
