@@ -25,6 +25,7 @@ const frameStatus = document.getElementById('frameStatus');
 const resultSection = document.getElementById('resultSection');
 const receivedText = document.getElementById('receivedText');
 const errorMessage = document.getElementById('errorMessage');
+const scanStatus = document.getElementById('scanStatus');
 
 // スキャン開始
 async function startScanning() {
@@ -55,6 +56,7 @@ async function startScanning() {
             cameraContainer.style.display = 'block';
             progressContainer.style.display = 'block';
             errorMessage.style.display = 'none';
+            updateScanStatus('QRコードをスキャン中...');
             
             // スキャン開始
             scanning = true;
@@ -110,6 +112,7 @@ function scanQRCode() {
     });
     
     if (code) {
+        updateScanStatus('QRコード検出 - 処理中...');
         processQRCode(code.data);
     }
 }
@@ -149,12 +152,15 @@ function processQRCode(data) {
         // フレーム保存（重複は上書き）
         if (!receivedFrames.has(parsed.sequence)) {
             receivedFrames.set(parsed.sequence, parsed.data);
+            updateScanStatus(`フレーム ${parsed.sequence} 受信完了`);
             updateProgress();
             
             // 完了チェック
             if (receivedFrames.size === expectedFrames) {
                 onReceiveComplete();
             }
+        } else {
+            updateScanStatus('QRコードをスキャン中...');
         }
     }
 }
@@ -239,6 +245,7 @@ async function onReceiveComplete() {
     }
     
     // 結果表示
+    updateScanStatus('受信完了！');
     progressContainer.style.display = 'none';
     resultSection.style.display = 'block';
     receivedText.textContent = reconstructedData;
@@ -328,5 +335,12 @@ async function releaseWakeLock() {
     if (wakeLock !== null) {
         await wakeLock.release();
         wakeLock = null;
+    }
+}
+
+// スキャン状態更新
+function updateScanStatus(message) {
+    if (scanStatus) {
+        scanStatus.textContent = message;
     }
 }

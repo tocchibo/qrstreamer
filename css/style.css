@@ -1,5 +1,21 @@
 /* QRコード転送システム共通スタイル */
 
+:root {
+    /* シンプルなカラーパレット */
+    --primary-color: #3498db;
+    --primary-dark: #2980b9;
+    --secondary-color: #e74c3c;
+    --secondary-dark: #c0392b;
+    --success-color: #27ae60;
+    
+    /* ニュートラルカラー */
+    --background-color: #f5f5f5;
+    --card-background: #ffffff;
+    --text-primary: #333333;
+    --text-secondary: #666666;
+    --border-color: #dddddd;
+}
+
 * {
     box-sizing: border-box;
 }
@@ -8,23 +24,25 @@ body {
     font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
     margin: 0;
     padding: 20px;
-    background-color: #f5f5f5;
-    color: #333;
+    background-color: var(--background-color);
+    color: var(--text-primary);
 }
 
 .container {
     max-width: 600px;
     margin: 0 auto;
-    background-color: white;
+    background-color: var(--card-background);
     padding: 20px;
     border-radius: 8px;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border: 1px solid var(--border-color);
 }
 
 h1 {
     margin-top: 0;
-    color: #2c3e50;
+    color: var(--primary-color);
     text-align: center;
+    font-weight: 600;
+    font-size: 1.8rem;
 }
 
 /* フォーム要素 */
@@ -44,7 +62,7 @@ input[type="range"] {
 }
 
 button {
-    background-color: #3498db;
+    background-color: var(--primary-color);
     color: white;
     border: none;
     padding: 10px 20px;
@@ -54,21 +72,13 @@ button {
     margin: 5px;
 }
 
-button:hover {
-    background-color: #2980b9;
-}
-
 button:disabled {
-    background-color: #bdc3c7;
+    background-color: var(--text-secondary);
     cursor: not-allowed;
 }
 
 button.stop {
-    background-color: #e74c3c;
-}
-
-button.stop:hover {
-    background-color: #c0392b;
+    background-color: var(--secondary-color);
 }
 
 /* QRコード表示エリア */
@@ -112,8 +122,21 @@ button.stop:hover {
     transform: translate(-50%, -50%);
     width: 250px;
     height: 250px;
-    border: 3px solid #3498db;
+    border: 3px solid var(--primary-color);
     border-radius: 8px;
+    pointer-events: none;
+}
+
+.scan-status {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 4px;
+    font-size: 14px;
     pointer-events: none;
 }
 
@@ -132,7 +155,7 @@ button.stop:hover {
 
 .progress-fill {
     height: 100%;
-    background-color: #2ecc71;
+    background-color: var(--success-color);
     transition: width 0.3s ease;
 }
 
@@ -142,17 +165,44 @@ button.stop:hover {
     font-size: 14px;
 }
 
+/* カードレイアウト */
+.input-section, .control-section {
+    background-color: var(--card-background);
+    padding: 20px;
+    border-radius: 4px;
+    margin: 15px 0;
+    border: 1px solid var(--border-color);
+}
+
+.camera-section {
+    background-color: var(--card-background);
+    padding: 20px;
+    border-radius: 4px;
+    margin: 15px 0;
+    border: 1px solid var(--border-color);
+}
+
+.progress-container {
+    background-color: var(--card-background);
+    padding: 20px;
+    border-radius: 4px;
+    margin: 15px 0;
+    border: 1px solid var(--border-color);
+}
+
 /* 情報表示 */
 .info {
-    background-color: #ecf0f1;
+    background-color: var(--background-color);
     padding: 10px;
     border-radius: 4px;
     margin: 10px 0;
     font-size: 14px;
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
 }
 
 .error {
-    background-color: #e74c3c;
+    background-color: var(--secondary-color);
     color: white;
     padding: 10px;
     border-radius: 4px;
@@ -160,7 +210,7 @@ button.stop:hover {
 }
 
 .success {
-    background-color: #2ecc71;
+    background-color: var(--success-color);
     color: white;
     padding: 10px;
     border-radius: 4px;
@@ -258,14 +308,14 @@ button.stop:hover {
 }
 
 .frame-indicator.received {
-    background-color: #2ecc71;
-    border-color: #27ae60;
+    background-color: var(--success-color);
+    border-color: var(--success-color);
     color: white;
 }
 
 .frame-indicator.header {
-    background-color: #3498db;
-    border-color: #2980b9;
+    background-color: var(--primary-color);
+    border-color: var(--primary-color);
     color: white;
 }
 
