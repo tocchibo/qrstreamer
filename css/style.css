@@ -77,14 +77,21 @@ button:disabled {
     cursor: not-allowed;
 }
 
-button.stop {
-    background-color: var(--secondary-color);
-}
-
 /* QRコード表示エリア */
-.qr-display {
+.qr-container {
     text-align: center;
     margin: 20px 0;
+}
+
+.frame-number {
+    font-size: 14px;
+    color: var(--text-secondary);
+    margin-bottom: 2px;
+    height: 20px;
+}
+
+.qr-display {
+    text-align: center;
     min-height: 400px;
     display: flex;
     flex-direction: column;
@@ -120,8 +127,8 @@ button.stop {
     top: 50%;
     left: 50%;
     transform: translate(-50%, -50%);
-    width: 250px;
-    height: 250px;
+    width: 320px;
+    height: 320px;
     border: 3px solid var(--primary-color);
     border-radius: 8px;
     pointer-events: none;
@@ -222,11 +229,6 @@ button.stop {
 
 .start-transmission {
     text-align: center;
-    margin: 20px 0;
-    background-color: var(--background-color);
-    padding: 20px;
-    border-radius: 4px;
-    border: 1px solid var(--border-color);
 }
 
 .start-transmission .instruction {
@@ -320,26 +322,6 @@ button.stop {
     background-color: #2980b9;
 }
 
-/* フレーム情報（大きな表示） */
-.frame-info-large {
-    text-align: center;
-    margin: 20px 0;
-    background-color: #ecf0f1;
-    padding: 20px;
-    border-radius: 8px;
-}
-
-.frame-info-large h2 {
-    font-size: 48px;
-    margin: 0;
-    color: #2c3e50;
-}
-
-.frame-type {
-    font-size: 18px;
-    color: #7f8c8d;
-    margin-top: 10px;
-}
 
 /* 手動コントロール */
 .manual-controls {
@@ -406,10 +388,6 @@ button.stop {
         text-align: center;
     }
     
-    .frame-info-large h2 {
-        font-size: 36px;
-    }
-    
     .manual-controls {
         flex-wrap: wrap;
     }
@@ -418,4 +396,47 @@ button.stop {
         min-width: 80px;
         font-size: 14px;
     }
+}
+
+/* 新規送信ボタン */
+button.new-transmission {
+    background-color: var(--success-color);
+    color: white;
+    padding: 12px 24px;
+    font-size: 16px;
+}
+
+/* 間隔設定セクション */
+.interval-section {
+    background-color: var(--background-color);
+    padding: 15px;
+    border-radius: 4px;
+    border: 1px solid var(--border-color);
+}
+
+/* 再生制御ボタン（セカンダリ） */
+.secondary-controls {
+    text-align: center;
+    margin: 15px 0;
+}
+
+.secondary-controls button {
+    background-color: var(--text-secondary);
+    font-size: 14px;
+}
+
+/* 送信完了メッセージ */
+.transmission-complete {
+    background-color: #e8f5e9;
+    padding: 20px;
+    border-radius: 4px;
+    border: 1px solid #a5d6a7;
+    margin: 20px 0;
+    text-align: center;
+}
+
+.transmission-complete .message {
+    color: #2e7d32;
+    font-size: 16px;
+    line-height: 1.5;
 }

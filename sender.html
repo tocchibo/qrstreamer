@@ -22,48 +22,59 @@
             </div>
         </div>
         
-        <div class="control-section">
-            <label for="intervalSlider">
-                表示間隔: <span id="intervalValue">1000</span>ms
-            </label>
-            <input type="range" id="intervalSlider" min="500" max="3000" value="1000" step="100">
-            
-            <div style="text-align: center; margin-top: 20px;">
+        <div class="control-section" id="controlSection">
+            <div id="startButtonContainer" style="text-align: center;">
                 <button id="startButton" onclick="startTransmission()">送信開始</button>
-                <button id="stopButton" class="stop" onclick="stopTransmission()" style="display: none;">停止</button>
-                <button id="newTransmissionButton" class="new" onclick="newTransmission()" style="display: none;">新規送信</button>
+            </div>
+            <div class="start-transmission" id="startTransmissionSection" style="display: none;">
+                <div class="instruction">
+                    📱 受信側でこのQRコードをスキャンしてください<br>
+                    準備完了の指示があったら下のボタンを押してください
+                </div>
+                <button id="startLoopButton" onclick="startLoop()">データ送信を開始</button>
             </div>
         </div>
         
-        <div class="qr-display" id="qrDisplay">
-            <p>QRコードがここに表示されます</p>
-        </div>
-        
-        <div class="start-transmission" id="startTransmissionSection" style="display: none;">
-            <div class="instruction">
-                📱 受信側でこのQRコードをスキャンしてください<br>
-                準備完了の指示があったら下のボタンを押してください
+        <div class="qr-container">
+            <div class="frame-number" id="frameNumber" style="display: none;"></div>
+            <div class="qr-display" id="qrDisplay">
+                <p>QRコードがここに表示されます</p>
             </div>
-            <button id="startLoopButton" onclick="startLoop()">データ送信を開始</button>
         </div>
         
-        <div class="frame-info-large" id="frameInfoLarge" style="display: none;">
-            <h2><span id="currentFrameLarge">1</span> / <span id="totalFramesLarge">1</span></h2>
-            <div class="frame-type" id="frameType">データフレーム</div>
+        <div class="transmission-complete" id="transmissionCompleteSection" style="display: none;">
+            <div class="message">
+                ✅ 全フレームの送信が完了しました<br>
+                受信できていないフレームがある場合は、「前へ」「次へ」ボタンで該当フレームを表示し、受信側で読み取ってください
+            </div>
         </div>
+        
         
         <div class="manual-controls" id="manualControls" style="display: none;">
             <button onclick="previousFrame()">◀ 前へ</button>
+            <button id="pauseButton" onclick="togglePause()">⏸ 一時停止</button>
             <button onclick="nextFrame()">次へ ▶</button>
-            <button id="pauseButton" onclick="togglePause()">一時停止</button>
-            <button onclick="jumpToFrame(1)">最初</button>
-            <button onclick="jumpToLastFrame()">最後</button>
+        </div>
+        
+        <div class="secondary-controls" id="secondaryControls" style="display: none;">
+            <button onclick="restartFromBeginning()">最初から再生</button>
+            <button onclick="showHeader()">ヘッダQR表示</button>
         </div>
         
         <div class="info" id="frameInfo" style="display: none;">
             フレーム: <span id="currentFrame">1</span> / <span id="totalFrames">1</span>
         </div>
         
+        <div class="interval-section" style="margin-top: 30px;">
+            <label for="intervalSlider">
+                表示間隔: <span id="intervalValue">1000</span>ms
+            </label>
+            <input type="range" id="intervalSlider" min="500" max="3000" value="1000" step="100">
+        </div>
+        
+        <div class="new-transmission-section" style="text-align: center; margin-top: 30px;">
+            <button id="newTransmissionButton" class="new-transmission" onclick="newTransmission()" style="display: none;">新規送信</button>
+        </div>
         
         <div style="text-align: center; margin-top: 20px;">
             <a href="index.html">トップページに戻る</a>

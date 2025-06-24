@@ -13,24 +13,44 @@ const byteCount = document.getElementById('byteCount');
 const intervalSlider = document.getElementById('intervalSlider');
 const intervalValue = document.getElementById('intervalValue');
 const startButton = document.getElementById('startButton');
-const stopButton = document.getElementById('stopButton');
 const newTransmissionButton = document.getElementById('newTransmissionButton');
 const qrDisplay = document.getElementById('qrDisplay');
 const frameInfo = document.getElementById('frameInfo');
 const currentFrame = document.getElementById('currentFrame');
 const totalFrames = document.getElementById('totalFrames');
-const frameInfoLarge = document.getElementById('frameInfoLarge');
-const currentFrameLarge = document.getElementById('currentFrameLarge');
-const totalFramesLarge = document.getElementById('totalFramesLarge');
-const frameType = document.getElementById('frameType');
+const frameNumber = document.getElementById('frameNumber');
 const manualControls = document.getElementById('manualControls');
 const pauseButton = document.getElementById('pauseButton');
 const startTransmissionSection = document.getElementById('startTransmissionSection');
 const startLoopButton = document.getElementById('startLoopButton');
+const secondaryControls = document.getElementById('secondaryControls');
+const transmissionCompleteSection = document.getElementById('transmissionCompleteSection');
+const startButtonContainer = document.getElementById('startButtonContainer');
+const controlSection = document.getElementById('controlSection');
 
 // イベントリスナーの設定
 inputText.addEventListener('input', updateTextInfo);
 intervalSlider.addEventListener('input', updateIntervalDisplay);
+
+// キーボードショートカット
+document.addEventListener('keydown', (e) => {
+    if (!isTransmitting) return;
+    
+    switch(e.key) {
+        case 'ArrowLeft':
+            e.preventDefault();
+            previousFrame();
+            break;
+        case 'ArrowRight':
+            e.preventDefault();
+            nextFrame();
+            break;
+        case ' ':
+            e.preventDefault();
+            togglePause();
+            break;
+    }
+});
 
 // テキスト情報の更新
 function updateTextInfo() {
@@ -65,11 +85,10 @@ async function startTransmission() {
         qrFrames = await generateQRFrames(text);
         currentFrameIndex = 0;
         
-        // UI更新（ヘッダーQRのみ表示）
-        startButton.style.display = 'none';
-        stopButton.style.display = 'inline-block';
-        newTransmissionButton.style.display = 'inline-block';
+        // UI更新（ヘッダーQRと送信開始ボタンを表示）
+        startButtonContainer.style.display = 'none';
         startTransmissionSection.style.display = 'block';
+        newTransmissionButton.style.display = 'inline-block';
         
         // ヘッダーQRコードのみ表示
         displayHeaderOnly();
@@ -85,6 +104,9 @@ function displayHeaderOnly() {
     if (!qrFrames || qrFrames.length === 0) return;
     
     const headerFrame = qrFrames[0];
+    
+    // フレーム番号を非表示
+    frameNumber.style.display = 'none';
     
     // QRコード表示
     qrDisplay.innerHTML = '';
@@ -113,22 +135,24 @@ function startLoop() {
     currentFrameIndex = 0;
     
     // UI更新
-    startTransmissionSection.style.display = 'none';
+    controlSection.style.display = 'none'; // 空のコントロールセクションを非表示
     frameInfo.style.display = 'block';
-    frameInfoLarge.style.display = 'block';
+    frameNumber.style.display = 'block';
     manualControls.style.display = 'flex';
-    totalFrames.textContent = qrFrames.length;
-    totalFramesLarge.textContent = qrFrames.length;
+    secondaryControls.style.display = 'block';
+    transmissionCompleteSection.style.display = 'none';
+    totalFrames.textContent = qrFrames.length - 1; // ヘッダーを除外
     
-    // 表示開始
-    displayNextFrame();
+    // ヘッダーをスキップして最初のデータフレームから開始
+    currentFrameIndex = 1;
+    displayCurrentFrame();
     
     // インターバル設定
     const interval = parseInt(intervalSlider.value);
     transmissionInterval = setInterval(displayNextFrame, interval);
 }
 
-// 送信停止
+// 送信停止（Wake Lock解放用）
 function stopTransmission() {
     isTransmitting = false;
     
@@ -136,24 +160,33 @@ function stopTransmission() {
         clearInterval(transmissionInterval);
         transmissionInterval = null;
     }
-    
-    // UI更新
-    startButton.style.display = 'inline-block';
-    stopButton.style.display = 'none';
-    newTransmissionButton.style.display = 'none';
-    frameInfo.style.display = 'none';
-    frameInfoLarge.style.display = 'none';
-    manualControls.style.display = 'none';
-    startTransmissionSection.style.display = 'none';
-    qrDisplay.innerHTML = '<p>QRコードがここに表示されます</p>';
-    isPaused = false;
-    pauseButton.textContent = '一時停止';
 }
 
 // 新規送信
 function newTransmission() {
-    // 現在の送信を停止
-    stopTransmission();
+    // 送信中の場合は停止
+    if (isTransmitting) {
+        isTransmitting = false;
+        
+        if (transmissionInterval) {
+            clearInterval(transmissionInterval);
+            transmissionInterval = null;
+        }
+    }
+    
+    // UI更新
+    controlSection.style.display = 'block';
+    startButtonContainer.style.display = 'block';
+    startTransmissionSection.style.display = 'none';
+    newTransmissionButton.style.display = 'none';
+    frameInfo.style.display = 'none';
+    frameNumber.style.display = 'none';
+    manualControls.style.display = 'none';
+    secondaryControls.style.display = 'none';
+    transmissionCompleteSection.style.display = 'none';
+    qrDisplay.innerHTML = '<p>QRコードがここに表示されます</p>';
+    isPaused = false;
+    pauseButton.innerHTML = '⏸ 一時停止';
     
     // テキストエリアをクリアしてフォーカス
     inputText.value = '';
@@ -211,15 +244,13 @@ function displayCurrentFrame() {
     
     const frame = qrFrames[currentFrameIndex];
     
-    // フレーム情報更新
+    // フレーム情報更新（ヘッダーを除外して表示）
     if (frame.type === 'header') {
         currentFrame.textContent = 'H';
-        currentFrameLarge.textContent = 'H';
-        frameType.textContent = 'ヘッダーフレーム';
+        frameNumber.textContent = 'H';
     } else {
         currentFrame.textContent = frame.sequence;
-        currentFrameLarge.textContent = frame.sequence;
-        frameType.textContent = `データフレーム ${frame.sequence}`;
+        frameNumber.textContent = frame.sequence + ' / ' + (qrFrames.length - 1);
     }
     
     // QRコード生成と表示
@@ -250,15 +281,13 @@ function displayNextFrame() {
     
     const frame = qrFrames[currentFrameIndex];
     
-    // フレーム情報更新
+    // フレーム情報更新（ヘッダーを除外して表示）
     if (frame.type === 'header') {
         currentFrame.textContent = 'H';
-        currentFrameLarge.textContent = 'H';
-        frameType.textContent = 'ヘッダーフレーム';
+        frameNumber.textContent = 'H';
     } else {
         currentFrame.textContent = frame.sequence;
-        currentFrameLarge.textContent = frame.sequence;
-        frameType.textContent = `データフレーム ${frame.sequence}`;
+        frameNumber.textContent = frame.sequence + ' / ' + (qrFrames.length - 1);
     }
     
     // QRコード生成と表示
@@ -299,7 +328,23 @@ function displayNextFrame() {
     
     // 次のフレームへ（一時停止中でなければ）
     if (!isPaused) {
-        currentFrameIndex = (currentFrameIndex + 1) % qrFrames.length;
+        currentFrameIndex++;
+        
+        // 最後のフレームに到達した場合
+        if (currentFrameIndex >= qrFrames.length) {
+            // 送信完了処理
+            clearInterval(transmissionInterval);
+            transmissionInterval = null;
+            isPaused = true;
+            pauseButton.innerHTML = '▶ 再生';
+            transmissionCompleteSection.style.display = 'block';
+            return;
+        }
+        
+        // ヘッダーをスキップ
+        if (currentFrameIndex === 0) {
+            currentFrameIndex = 1;
+        }
     }
 }
 
@@ -309,9 +354,13 @@ function previousFrame() {
     
     // 一時停止して手動操作
     isPaused = true;
-    pauseButton.textContent = '再開';
+    pauseButton.innerHTML = '▶ 再生';
     
-    currentFrameIndex = (currentFrameIndex - 1 + qrFrames.length) % qrFrames.length;
+    currentFrameIndex--;
+    // ヘッダーをスキップ
+    if (currentFrameIndex <= 0) {
+        currentFrameIndex = qrFrames.length - 1;
+    }
     displayCurrentFrame();
 }
 
@@ -320,15 +369,19 @@ function nextFrame() {
     
     // 一時停止して手動操作
     isPaused = true;
-    pauseButton.textContent = '再開';
+    pauseButton.innerHTML = '▶ 再生';
     
-    currentFrameIndex = (currentFrameIndex + 1) % qrFrames.length;
+    currentFrameIndex++;
+    if (currentFrameIndex >= qrFrames.length) {
+        currentFrameIndex = 1; // ヘッダーをスキップ
+    }
     displayCurrentFrame();
 }
 
 function togglePause() {
     isPaused = !isPaused;
-    pauseButton.textContent = isPaused ? '再開' : '一時停止';
+    pauseButton.innerHTML = isPaused ? '▶ 再生' : '⏸ 一時停止';
+    transmissionCompleteSection.style.display = 'none';
 }
 
 // フレームジャンプ機能
@@ -337,9 +390,14 @@ function jumpToFrame(frameNumber) {
     
     // 一時停止して手動操作
     isPaused = true;
-    pauseButton.textContent = '再開';
+    pauseButton.innerHTML = '▶ 再生';
     
-    currentFrameIndex = Math.max(0, Math.min(frameNumber - 1, qrFrames.length - 1));
+    // ヘッダーを考慮したインデックス計算
+    if (frameNumber === 0) {
+        currentFrameIndex = 0; // ヘッダー
+    } else {
+        currentFrameIndex = Math.max(1, Math.min(frameNumber, qrFrames.length - 1));
+    }
     displayCurrentFrame();
 }
 
@@ -371,6 +429,42 @@ async function releaseWakeLock() {
     }
 }
 
+// 最初から再生
+function restartFromBeginning() {
+    if (!isTransmitting || qrFrames.length === 0) return;
+    
+    // インターバルをクリア
+    if (transmissionInterval) {
+        clearInterval(transmissionInterval);
+    }
+    
+    // 最初のデータフレームから再開
+    currentFrameIndex = 1;
+    isPaused = false;
+    pauseButton.innerHTML = '⏸ 一時停止';
+    transmissionCompleteSection.style.display = 'none';
+    
+    displayCurrentFrame();
+    
+    // インターバル再設定
+    const interval = parseInt(intervalSlider.value);
+    transmissionInterval = setInterval(displayNextFrame, interval);
+}
+
+// ヘッダQR表示
+function showHeader() {
+    if (!isTransmitting || qrFrames.length === 0) return;
+    
+    // 一時停止して手動操作
+    isPaused = true;
+    pauseButton.innerHTML = '▶ 再生';
+    transmissionCompleteSection.style.display = 'none';
+    
+    // ヘッダーフレームを表示
+    currentFrameIndex = 0;
+    displayCurrentFrame();
+}
+
 // グローバル関数として登録
 window.startLoop = startLoop;
 window.previousFrame = previousFrame;
@@ -380,6 +474,8 @@ window.displayCurrentFrame = displayCurrentFrame;
 window.jumpToFrame = jumpToFrame;
 window.jumpToLastFrame = jumpToLastFrame;
 window.newTransmission = newTransmission;
+window.restartFromBeginning = restartFromBeginning;
+window.showHeader = showHeader;
 
 // 送信開始時にWake Lockを取得
 window.addEventListener('load', () => {
