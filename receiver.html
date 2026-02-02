@@ -16,6 +16,16 @@
         <h1>QRコード受信</h1>
         
         <div class="camera-section">
+            <div class="device-controls">
+                <label for="videoSource">カメラ/キャプチャ選択</label>
+                <div class="device-row">
+                    <select id="videoSource">
+                        <option value="auto">自動（背面優先）</option>
+                    </select>
+                    <button id="refreshDevices" class="secondary" type="button">一覧更新</button>
+                </div>
+                <div class="device-hint" id="deviceHint">利用可能なデバイスを検索中...</div>
+            </div>
             <div class="camera-preview" id="cameraContainer" style="display: none;">
                 <video id="video" autoplay playsinline></video>
                 <canvas id="canvas" style="display: none;"></canvas>

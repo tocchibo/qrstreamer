@@ -5,6 +5,7 @@ let canvas = null;
 let context = null;
 let scanning = false;
 let scanInterval = null;
+let currentStream = null;
 
 // 受信データ管理
 let headerInfo = null;
@@ -25,27 +26,33 @@ const receivedText = document.getElementById('receivedText');
 const errorMessage = document.getElementById('errorMessage');
 const scanStatus = document.getElementById('scanStatus');
 const readyMessage = document.getElementById('readyMessage');
+const videoSource = document.getElementById('videoSource');
+const refreshDevicesButton = document.getElementById('refreshDevices');
+const deviceHint = document.getElementById('deviceHint');
+
+// デバイス選択の初期化
+initializeDeviceControls();
 
 // スキャン開始
 async function startScanning() {
     try {
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            showError('このブラウザではカメラ機能が利用できません');
+            return;
+        }
+
         // カメラアクセス
         video = document.getElementById('video');
         canvas = document.getElementById('canvas');
         context = canvas.getContext('2d');
-        
-        const stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-                facingMode: 'environment', // 背面カメラを優先
-                width: { ideal: 1280 },
-                height: { ideal: 720 }
-            }
-        });
-        
+
+        const constraints = buildVideoConstraints();
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
+        currentStream = stream;
         video.srcObject = stream;
-        
+
         // ビデオのメタデータ読み込み完了を待つ
-        video.addEventListener('loadedmetadata', () => {
+        video.onloadedmetadata = () => {
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             
@@ -54,12 +61,16 @@ async function startScanning() {
             stopButton.style.display = 'inline-block';
             cameraContainer.style.display = 'block';
             errorMessage.style.display = 'none';
+            setDeviceControlsEnabled(false);
             updateScanStatus('QRコードをスキャン');
             
             // スキャン開始
             scanning = true;
             scanInterval = setInterval(scanQRCode, 100); // 100msごとにスキャン
-        });
+        };
+
+        // 権限取得後にデバイス名を更新
+        updateDeviceList(false);
         
         // Wake Lock取得
         await requestWakeLock();
@@ -67,6 +78,7 @@ async function startScanning() {
     } catch (error) {
         console.error('カメラアクセスエラー:', error);
         showError('カメラへのアクセスが拒否されました。カメラの使用を許可してください。');
+        setDeviceControlsEnabled(true);
     }
 }
 
@@ -84,6 +96,9 @@ function stopScanning() {
         tracks.forEach(track => track.stop());
         video.srcObject = null;
     }
+    if (currentStream) {
+        currentStream = null;
+    }
     
     // UI更新
     startButton.style.display = 'inline-block';
@@ -91,9 +106,153 @@ function stopScanning() {
     cameraContainer.style.display = 'none';
     progressContainer.style.display = 'none';
     readyMessage.style.display = 'none';
+    setDeviceControlsEnabled(true);
     
     // Wake Lock解放
     releaseWakeLock();
+}
+
+// デバイス選択関連
+function setDeviceControlsEnabled(enabled) {
+    if (!videoSource || !refreshDevicesButton) return;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+        videoSource.disabled = true;
+        refreshDevicesButton.disabled = true;
+        return;
+    }
+    videoSource.disabled = !enabled;
+    refreshDevicesButton.disabled = !enabled;
+}
+
+function getSelectedDeviceId() {
+    if (!videoSource) return null;
+    const value = videoSource.value;
+    if (!value || value === 'auto' || value === 'none') return null;
+    return value;
+}
+
+function buildVideoConstraints() {
+    const selectedId = getSelectedDeviceId();
+    const baseConstraints = {
+        width: { ideal: 1280 },
+        height: { ideal: 720 }
+    };
+
+    if (selectedId) {
+        return {
+            video: {
+                ...baseConstraints,
+                deviceId: { exact: selectedId }
+            }
+        };
+    }
+
+    return {
+        video: {
+            ...baseConstraints,
+            facingMode: 'environment' // 背面カメラを優先
+        }
+    };
+}
+
+function updateDeviceHint(message) {
+    if (deviceHint) {
+        deviceHint.textContent = message;
+    }
+}
+
+async function updateDeviceList(requestPermission = false) {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices || !videoSource) {
+        updateDeviceHint('このブラウザではデバイス選択が利用できません');
+        setDeviceControlsEnabled(false);
+        return;
+    }
+
+    let permissionError = null;
+    if (requestPermission) {
+        try {
+            const tempStream = await navigator.mediaDevices.getUserMedia({ video: true });
+            tempStream.getTracks().forEach(track => track.stop());
+        } catch (error) {
+            permissionError = error;
+        }
+    }
+
+    let devices = [];
+    try {
+        devices = await navigator.mediaDevices.enumerateDevices();
+    } catch (error) {
+        console.error('デバイス一覧取得エラー:', error);
+        updateDeviceHint('デバイス一覧の取得に失敗しました');
+        return;
+    }
+
+    const videoDevices = devices.filter(device => device.kind === 'videoinput');
+    const previousValue = videoSource.value;
+
+    videoSource.innerHTML = '';
+    const autoOption = document.createElement('option');
+    autoOption.value = 'auto';
+    autoOption.textContent = '自動（背面優先）';
+    videoSource.appendChild(autoOption);
+
+    if (videoDevices.length === 0) {
+        const emptyOption = document.createElement('option');
+        emptyOption.value = 'none';
+        emptyOption.textContent = '利用可能なカメラが見つかりません';
+        emptyOption.disabled = true;
+        videoSource.appendChild(emptyOption);
+        videoSource.value = 'auto';
+        updateDeviceHint('利用可能なカメラ/キャプチャが見つかりません。接続を確認するか「一覧更新」で許可してください');
+        return;
+    }
+
+    let hasLabel = false;
+    videoDevices.forEach((device, index) => {
+        const option = document.createElement('option');
+        const label = device.label ? device.label : `カメラ ${index + 1}`;
+        if (device.label) {
+            hasLabel = true;
+        }
+        option.value = device.deviceId;
+        option.textContent = label;
+        videoSource.appendChild(option);
+    });
+
+    const availableValues = Array.from(videoSource.options).map(option => option.value);
+    if (availableValues.includes(previousValue)) {
+        videoSource.value = previousValue;
+    } else {
+        videoSource.value = 'auto';
+    }
+
+    if (permissionError) {
+        updateDeviceHint('カメラの使用を許可すると名前が表示されます');
+    } else if (!hasLabel) {
+        updateDeviceHint('カメラ名を表示するには「一覧更新」を押してください');
+    } else {
+        updateDeviceHint(`ビデオ入力: ${videoDevices.length}件`);
+    }
+}
+
+async function initializeDeviceControls() {
+    if (!videoSource || !refreshDevicesButton || !deviceHint) {
+        return;
+    }
+
+    refreshDevicesButton.addEventListener('click', async () => {
+        await updateDeviceList(true);
+    });
+
+    if (navigator.mediaDevices && navigator.mediaDevices.addEventListener) {
+        navigator.mediaDevices.addEventListener('devicechange', () => {
+            if (!scanning) {
+                updateDeviceList(false);
+            }
+        });
+    }
+
+    await updateDeviceList(false);
 }
 
 // QRコードスキャン

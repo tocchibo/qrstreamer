@@ -27,6 +27,10 @@ const secondaryControls = document.getElementById('secondaryControls');
 const transmissionCompleteSection = document.getElementById('transmissionCompleteSection');
 const startButtonContainer = document.getElementById('startButtonContainer');
 const controlSection = document.getElementById('controlSection');
+const qrContainerWrapper = document.querySelector('.qr-container');
+
+let lastRenderedData = null;
+let lastRenderedLevel = null;
 
 // イベントリスナーの設定
 inputText.addEventListener('input', updateTextInfo);
@@ -71,6 +75,77 @@ function updateIntervalDisplay() {
     }
 }
 
+function getQrRenderSize() {
+    if (!qrDisplay) return 300;
+
+    const displayStyle = window.getComputedStyle(qrDisplay);
+    const paddingX = parseFloat(displayStyle.paddingLeft) + parseFloat(displayStyle.paddingRight);
+    const paddingY = parseFloat(displayStyle.paddingTop) + parseFloat(displayStyle.paddingBottom);
+    const maxWidth = qrDisplay.clientWidth - paddingX;
+    let maxHeight = maxWidth;
+
+    const isDesktop = window.matchMedia('(min-width: 900px)').matches;
+    if (isDesktop && qrContainerWrapper) {
+        const container = document.querySelector('.container.sender');
+        if (container) {
+            const containerRect = container.getBoundingClientRect();
+            const qrContainerRect = qrContainerWrapper.getBoundingClientRect();
+            const qrDisplayRect = qrDisplay.getBoundingClientRect();
+            const aboveHeight = qrContainerRect.top - containerRect.top;
+            const belowHeight = containerRect.bottom - qrContainerRect.bottom;
+            const availableForQrContainer = window.innerHeight - aboveHeight - belowHeight - 20;
+            const overhead = qrContainerRect.height - qrDisplayRect.height;
+            const availableForQrDisplay = availableForQrContainer - overhead - paddingY;
+
+            if (!Number.isNaN(availableForQrDisplay)) {
+                maxHeight = Math.min(maxHeight, availableForQrDisplay);
+            }
+        }
+    }
+
+    const minSize = isDesktop ? 260 : 220;
+    return Math.floor(Math.max(minSize, Math.min(maxWidth, maxHeight)));
+}
+
+function suppressQrTooltips(target) {
+    if (!target) return;
+    const nodes = target.querySelectorAll('[title]');
+    nodes.forEach(node => node.removeAttribute('title'));
+}
+
+function renderQrCode(data, correctLevel) {
+    if (typeof QRCode === 'undefined') {
+        console.error('QRCodeライブラリが読み込まれていません');
+        alert('QRCodeライブラリの読み込みエラー');
+        return;
+    }
+
+    const size = getQrRenderSize();
+    lastRenderedData = data;
+    lastRenderedLevel = correctLevel;
+
+    qrDisplay.innerHTML = '';
+    qrDisplay.classList.add('qr-active');
+
+    const qrContainer = document.createElement('div');
+    qrDisplay.appendChild(qrContainer);
+
+    new QRCode(qrContainer, {
+        text: data,
+        width: size,
+        height: size,
+        correctLevel: correctLevel
+    });
+
+    suppressQrTooltips(qrContainer);
+}
+
+function resetQrDisplayState() {
+    qrDisplay.classList.remove('qr-active');
+    lastRenderedData = null;
+    lastRenderedLevel = null;
+}
+
 // 送信開始（ヘッダーQRのみ表示）
 async function startTransmission() {
     const text = inputText.value.trim();
@@ -109,22 +184,7 @@ function displayHeaderOnly() {
     frameNumber.style.display = 'none';
     
     // QRコード表示
-    qrDisplay.innerHTML = '';
-    
-    if (typeof QRCode === 'undefined') {
-        console.error('QRCodeライブラリが読み込まれていません');
-        return;
-    }
-    
-    const qrContainer = document.createElement('div');
-    qrDisplay.appendChild(qrContainer);
-    
-    const qrcode = new QRCode(qrContainer, {
-        text: headerFrame.data,
-        width: 300,
-        height: 300,
-        correctLevel: QRCode.CorrectLevel.L
-    });
+    renderQrCode(headerFrame.data, QRCode.CorrectLevel.L);
 }
 
 // データ送信開始（ループ表示）
@@ -185,6 +245,7 @@ function newTransmission() {
     secondaryControls.style.display = 'none';
     transmissionCompleteSection.style.display = 'none';
     qrDisplay.innerHTML = '<p>QRコードがここに表示されます</p>';
+    resetQrDisplayState();
     isPaused = false;
     pauseButton.innerHTML = '⏸ 一時停止';
     
@@ -254,23 +315,7 @@ function displayCurrentFrame() {
     }
     
     // QRコード生成と表示
-    qrDisplay.innerHTML = '';
-    
-    if (typeof QRCode === 'undefined') {
-        console.error('QRCodeライブラリが読み込まれていません');
-        alert('QRCodeライブラリの読み込みエラー');
-        return;
-    }
-    
-    const qrContainer = document.createElement('div');
-    qrDisplay.appendChild(qrContainer);
-    
-    const qrcode = new QRCode(qrContainer, {
-        text: frame.data,
-        width: 300,
-        height: 300,
-        correctLevel: QRCode.CorrectLevel.L
-    });
+    renderQrCode(frame.data, QRCode.CorrectLevel.L);
 }
 
 // 次のフレームを表示
@@ -291,19 +336,6 @@ function displayNextFrame() {
     }
     
     // QRコード生成と表示
-    qrDisplay.innerHTML = '';
-    
-    // デバッグ: ライブラリ確認
-    if (typeof QRCode === 'undefined') {
-        console.error('QRCodeライブラリが読み込まれていません');
-        alert('QRCodeライブラリの読み込みエラー');
-        return;
-    }
-    
-    // QRCode.jsライブラリを使用
-    const qrContainer = document.createElement('div');
-    qrDisplay.appendChild(qrContainer);
-    
     // デバッグ: フレームデータサイズを表示
     const frameByteSize = Utils.getByteLength(frame.data);
     console.log(`フレーム${currentFrameIndex + 1} 総サイズ: ${frameByteSize}バイト（ASCII文字のみ）`);
@@ -319,12 +351,7 @@ function displayNextFrame() {
         }
     }
     
-    const qrcode = new QRCode(qrContainer, {
-        text: frame.data,
-        width: 300,
-        height: 300,
-        correctLevel: QRCode.CorrectLevel.L  // エラー訂正レベルをLに下げて容量を増やす
-    });
+    renderQrCode(frame.data, QRCode.CorrectLevel.L); // エラー訂正レベルをLに下げて容量を増やす
     
     // 次のフレームへ（一時停止中でなければ）
     if (!isPaused) {
@@ -491,4 +518,10 @@ window.addEventListener('load', () => {
         originalStop();
         await releaseWakeLock();
     };
+});
+
+window.addEventListener('resize', () => {
+    if (lastRenderedData) {
+        renderQrCode(lastRenderedData, lastRenderedLevel || QRCode.CorrectLevel.L);
+    }
 });

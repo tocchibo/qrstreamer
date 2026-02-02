@@ -77,6 +77,10 @@ button:disabled {
     cursor: not-allowed;
 }
 
+button.secondary {
+    background-color: var(--text-secondary);
+}
+
 /* QRコード表示エリア */
 .qr-container {
     text-align: center;
@@ -92,7 +96,7 @@ button:disabled {
 
 .qr-display {
     text-align: center;
-    min-height: 400px;
+    min-height: 260px;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -105,6 +109,12 @@ button:disabled {
 .qr-display canvas {
     max-width: 100%;
     height: auto;
+}
+
+.qr-display.qr-active,
+.qr-display.qr-active * {
+    cursor: none;
+    user-select: none;
 }
 
 /* カメラプレビュー */
@@ -145,6 +155,42 @@ button:disabled {
     border-radius: 4px;
     font-size: 14px;
     pointer-events: none;
+}
+
+/* デバイス選択 */
+.device-controls {
+    margin: 10px 0 20px;
+}
+
+.device-controls label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 14px;
+    color: var(--text-secondary);
+}
+
+.device-row {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.device-row select {
+    flex: 1;
+    min-width: 220px;
+    padding: 8px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    font-size: 14px;
+    background-color: white;
+    color: var(--text-primary);
+}
+
+.device-hint {
+    margin-top: 6px;
+    font-size: 12px;
+    color: var(--text-secondary);
 }
 
 /* 進捗表示 */
@@ -439,4 +485,14 @@ button.new-transmission {
     color: #2e7d32;
     font-size: 16px;
     line-height: 1.5;
+}
+
+@media (min-width: 900px) {
+    .container.sender {
+        max-width: 1100px;
+    }
+
+    .container.sender .qr-display {
+        min-height: 480px;
+    }
 }
