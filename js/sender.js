@@ -143,7 +143,7 @@ function suppressQrTooltips(target) {
 
 function renderQrCode(data, correctLevel) {
     if (typeof QRCode === 'undefined') {
-        alert('QRCodeライブラリの読み込みエラー');
+        showInlineToast('QRCodeライブラリの読み込みエラー');
         return;
     }
 
@@ -185,7 +185,7 @@ function resetQrDisplayState() {
 async function startTransmission() {
     const text = inputText.value;
     if (!text.trim()) {
-        alert('送信するテキストを入力してください');
+        showInlineToast('送信するテキストを入力してください');
         return;
     }
 
@@ -209,8 +209,7 @@ async function startTransmission() {
         }
         displayHeaderOnly();
     } catch (error) {
-        console.error('QRコード生成エラー:', error);
-        alert('QRコードの生成に失敗しました: ' + error.message);
+        showInlineToast('QRコードの生成に失敗しました: ' + error.message);
         startButton.disabled = false;
         startButton.textContent = '送信開始';
         await releaseWakeLock();
@@ -459,6 +458,7 @@ async function requestWakeLock() {
         if ('wakeLock' in navigator && !wakeLock) wakeLock = await navigator.wakeLock.request('screen');
     } catch (error) {
         console.warn('Wake Lock取得失敗:', error);
+        showInlineToast('Wake Lock取得失敗');
     }
 }
 
