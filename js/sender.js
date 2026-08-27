@@ -1,17 +1,41 @@
 // 送信側アプリケーションのロジック
 
+const TRANSMISSION_PROFILES = {
+    reliable: {
+        label: '読み取り優先',
+        chunkSize: 260,
+        fecGroupSize: 8,
+        fecParityCount: 2
+    },
+    balanced: {
+        label: 'バランス',
+        chunkSize: 330,
+        fecGroupSize: 10,
+        fecParityCount: 2
+    },
+    compact: {
+        label: '枚数優先',
+        chunkSize: 420,
+        fecGroupSize: 12,
+        fecParityCount: 2
+    }
+};
+const QR_CORRECT_LEVEL = () => QRCode.CorrectLevel.M;
+
 let qrFrames = [];
+let dataFrameCount = 0;
 let currentFrameIndex = 0;
 let transmissionInterval = null;
 let isTransmitting = false;
 let isPaused = false;
+let transmissionCompleted = false;
 
-// DOM要素の取得
 const inputText = document.getElementById('inputText');
 const charCount = document.getElementById('charCount');
 const byteCount = document.getElementById('byteCount');
 const intervalSlider = document.getElementById('intervalSlider');
 const intervalValue = document.getElementById('intervalValue');
+const reliabilityMode = document.getElementById('reliabilityMode');
 const startButton = document.getElementById('startButton');
 const newTransmissionButton = document.getElementById('newTransmissionButton');
 const qrDisplay = document.getElementById('qrDisplay');
@@ -22,56 +46,51 @@ const frameNumber = document.getElementById('frameNumber');
 const manualControls = document.getElementById('manualControls');
 const pauseButton = document.getElementById('pauseButton');
 const startTransmissionSection = document.getElementById('startTransmissionSection');
-const startLoopButton = document.getElementById('startLoopButton');
 const secondaryControls = document.getElementById('secondaryControls');
 const transmissionCompleteSection = document.getElementById('transmissionCompleteSection');
 const startButtonContainer = document.getElementById('startButtonContainer');
 const controlSection = document.getElementById('controlSection');
 const qrContainerWrapper = document.querySelector('.qr-container');
+const senderContainer = document.querySelector('.container.sender');
+const transmissionSummary = document.getElementById('transmissionSummary');
 
 let lastRenderedData = null;
 let lastRenderedLevel = null;
+let wakeLock = null;
 
-// イベントリスナーの設定
 inputText.addEventListener('input', updateTextInfo);
 intervalSlider.addEventListener('input', updateIntervalDisplay);
 
-// キーボードショートカット
-document.addEventListener('keydown', (e) => {
+document.addEventListener('keydown', (event) => {
     if (!isTransmitting) return;
-    
-    switch(e.key) {
-        case 'ArrowLeft':
-            e.preventDefault();
-            previousFrame();
-            break;
-        case 'ArrowRight':
-            e.preventDefault();
-            nextFrame();
-            break;
-        case ' ':
-            e.preventDefault();
-            togglePause();
-            break;
+
+    if (event.key === 'ArrowLeft') {
+        event.preventDefault();
+        previousFrame();
+    } else if (event.key === 'ArrowRight') {
+        event.preventDefault();
+        nextFrame();
+    } else if (event.key === ' ') {
+        event.preventDefault();
+        togglePause();
     }
 });
 
-// テキスト情報の更新
 function updateTextInfo() {
     const text = inputText.value;
     charCount.textContent = text.length;
     byteCount.textContent = Utils.getByteLength(text);
 }
 
-// 表示間隔の更新
 function updateIntervalDisplay() {
     intervalValue.textContent = intervalSlider.value;
-    
-    // 送信中の場合はリアルタイムで間隔を更新
-    if (isTransmitting && transmissionInterval) {
-        clearInterval(transmissionInterval);
-        const newInterval = parseInt(intervalSlider.value);
-        transmissionInterval = setInterval(displayNextFrame, newInterval);
+    if (isTransmitting && !isPaused && transmissionInterval) scheduleNextFrame();
+}
+
+function clearTransmissionTimer() {
+    if (transmissionInterval) {
+        clearTimeout(transmissionInterval);
+        transmissionInterval = null;
     }
 }
 
@@ -81,63 +100,74 @@ function getQrRenderSize() {
     const displayStyle = window.getComputedStyle(qrDisplay);
     const paddingX = parseFloat(displayStyle.paddingLeft) + parseFloat(displayStyle.paddingRight);
     const paddingY = parseFloat(displayStyle.paddingTop) + parseFloat(displayStyle.paddingBottom);
-    const maxWidth = qrDisplay.clientWidth - paddingX;
+    const maxWidth = Math.max(180, qrDisplay.clientWidth - paddingX);
     let maxHeight = maxWidth;
 
-    const isDesktop = window.matchMedia('(min-width: 900px)').matches;
-    if (isDesktop && qrContainerWrapper) {
-        const container = document.querySelector('.container.sender');
-        if (container) {
-            const containerRect = container.getBoundingClientRect();
-            const qrContainerRect = qrContainerWrapper.getBoundingClientRect();
-            const qrDisplayRect = qrDisplay.getBoundingClientRect();
-            const aboveHeight = qrContainerRect.top - containerRect.top;
-            const belowHeight = containerRect.bottom - qrContainerRect.bottom;
-            const availableForQrContainer = window.innerHeight - aboveHeight - belowHeight - 20;
-            const overhead = qrContainerRect.height - qrDisplayRect.height;
-            const availableForQrDisplay = availableForQrContainer - overhead - paddingY;
-
-            if (!Number.isNaN(availableForQrDisplay)) {
-                maxHeight = Math.min(maxHeight, availableForQrDisplay);
-            }
-        }
+    if (window.matchMedia('(min-width: 900px)').matches && qrContainerWrapper && senderContainer) {
+        const containerRect = senderContainer.getBoundingClientRect();
+        const qrContainerRect = qrContainerWrapper.getBoundingClientRect();
+        const qrDisplayRect = qrDisplay.getBoundingClientRect();
+        const aboveHeight = qrContainerRect.top - containerRect.top;
+        const belowHeight = containerRect.bottom - qrContainerRect.bottom;
+        const availableForQrContainer = window.innerHeight - aboveHeight - belowHeight - 16;
+        const overhead = qrContainerRect.height - qrDisplayRect.height;
+        const availableForQrDisplay = availableForQrContainer - overhead - paddingY;
+        if (Number.isFinite(availableForQrDisplay)) maxHeight = Math.min(maxHeight, availableForQrDisplay);
     }
 
-    const minSize = isDesktop ? 260 : 220;
-    return Math.floor(Math.max(minSize, Math.min(maxWidth, maxHeight)));
+    return Math.floor(Math.max(180, Math.min(maxWidth, maxHeight)));
+}
+
+function getModuleCount(data, correctLevel) {
+    const probeContainer = document.createElement('div');
+    const probe = new QRCode(probeContainer, {
+        text: data,
+        width: 64,
+        height: 64,
+        correctLevel
+    });
+    return probe._oQRCode && typeof probe._oQRCode.getModuleCount === 'function'
+        ? probe._oQRCode.getModuleCount()
+        : null;
 }
 
 function suppressQrTooltips(target) {
     if (!target) return;
-    const nodes = target.querySelectorAll('[title]');
-    nodes.forEach(node => node.removeAttribute('title'));
+    target.querySelectorAll('[title]').forEach(node => node.removeAttribute('title'));
 }
 
 function renderQrCode(data, correctLevel) {
     if (typeof QRCode === 'undefined') {
-        console.error('QRCodeライブラリが読み込まれていません');
         alert('QRCodeライブラリの読み込みエラー');
         return;
     }
 
-    const size = getQrRenderSize();
+    const maxSize = getQrRenderSize();
+    const moduleCount = getModuleCount(data, correctLevel);
+    // QR規格の4セル分の余白を確保し、セル幅を整数にして補間ぼけを防ぐ。
+    const cellSize = moduleCount ? Math.max(1, Math.floor(maxSize / (moduleCount + 8))) : 1;
+    const codeSize = moduleCount ? moduleCount * cellSize : Math.max(1, maxSize - 32);
+    const quietZone = moduleCount ? cellSize * 4 : 16;
+
     lastRenderedData = data;
     lastRenderedLevel = correctLevel;
-
     qrDisplay.innerHTML = '';
     qrDisplay.classList.add('qr-active');
 
-    const qrContainer = document.createElement('div');
-    qrDisplay.appendChild(qrContainer);
+    const quietZoneContainer = document.createElement('div');
+    quietZoneContainer.className = 'qr-quiet-zone';
+    quietZoneContainer.style.padding = `${quietZone}px`;
+    const codeContainer = document.createElement('div');
+    quietZoneContainer.appendChild(codeContainer);
+    qrDisplay.appendChild(quietZoneContainer);
 
-    new QRCode(qrContainer, {
+    new QRCode(codeContainer, {
         text: data,
-        width: size,
-        height: size,
-        correctLevel: correctLevel
+        width: codeSize,
+        height: codeSize,
+        correctLevel
     });
-
-    suppressQrTooltips(qrContainer);
+    suppressQrTooltips(codeContainer);
 }
 
 function resetQrDisplayState() {
@@ -146,97 +176,108 @@ function resetQrDisplayState() {
     lastRenderedLevel = null;
 }
 
-// 送信開始（ヘッダーQRのみ表示）
 async function startTransmission() {
-    const text = inputText.value.trim();
-    
-    if (!text) {
+    const text = inputText.value;
+    if (!text.trim()) {
         alert('送信するテキストを入力してください');
         return;
     }
-    
-    // QRコードフレームの生成
+
     try {
-        qrFrames = await generateQRFrames(text);
+        startButton.disabled = true;
+        startButton.textContent = '準備中...';
+        await requestWakeLock();
+        const generated = await generateQRFrames(text);
+        qrFrames = generated.frames;
+        dataFrameCount = generated.dataFrameCount;
         currentFrameIndex = 0;
-        
-        // UI更新（ヘッダーQRと送信開始ボタンを表示）
+
         startButtonContainer.style.display = 'none';
         startTransmissionSection.style.display = 'block';
         newTransmissionButton.style.display = 'inline-block';
-        
-        // ヘッダーQRコードのみ表示
+        senderContainer.classList.add('qr-mode');
+
+        if (transmissionSummary) {
+            const compressionText = generated.compressed ? '圧縮あり' : '圧縮なし';
+            transmissionSummary.textContent = `${generated.profileLabel}・送信QR ${qrFrames.length - 1}枚（復元用QRを含む・${compressionText}）`;
+        }
         displayHeaderOnly();
-        
     } catch (error) {
         console.error('QRコード生成エラー:', error);
         alert('QRコードの生成に失敗しました: ' + error.message);
+        startButton.disabled = false;
+        startButton.textContent = '送信開始';
+        await releaseWakeLock();
     }
 }
 
-// ヘッダーQRのみ表示
 function displayHeaderOnly() {
-    if (!qrFrames || qrFrames.length === 0) return;
-    
-    const headerFrame = qrFrames[0];
-    
-    // フレーム番号を非表示
+    if (!qrFrames.length) return;
     frameNumber.style.display = 'none';
-    
-    // QRコード表示
-    renderQrCode(headerFrame.data, QRCode.CorrectLevel.L);
+    renderQrCode(qrFrames[0].data, QR_CORRECT_LEVEL());
 }
 
-// データ送信開始（ループ表示）
 function startLoop() {
-    if (!qrFrames || qrFrames.length === 0) return;
-    
+    if (!qrFrames.length) return;
+
     isTransmitting = true;
-    currentFrameIndex = 0;
-    
-    // UI更新
-    controlSection.style.display = 'none'; // 空のコントロールセクションを非表示
+    isPaused = false;
+    transmissionCompleted = false;
+    currentFrameIndex = 1;
+
+    controlSection.style.display = 'none';
     frameInfo.style.display = 'block';
     frameNumber.style.display = 'block';
     manualControls.style.display = 'flex';
     secondaryControls.style.display = 'block';
     transmissionCompleteSection.style.display = 'none';
-    totalFrames.textContent = qrFrames.length - 1; // ヘッダーを除外
-    
-    // ヘッダーをスキップして最初のデータフレームから開始
-    currentFrameIndex = 1;
+    totalFrames.textContent = qrFrames.length - 1;
+    pauseButton.textContent = '⏸ 一時停止';
+
     displayCurrentFrame();
-    
-    // インターバル設定
-    const interval = parseInt(intervalSlider.value);
-    transmissionInterval = setInterval(displayNextFrame, interval);
+    scheduleNextFrame();
 }
 
-// 送信停止（Wake Lock解放用）
+function scheduleNextFrame() {
+    clearTransmissionTimer();
+    if (!isTransmitting || isPaused) return;
+
+    const interval = Number.parseInt(intervalSlider.value, 10);
+    transmissionInterval = setTimeout(() => {
+        transmissionInterval = null;
+        displayNextFrame();
+    }, interval);
+}
+
+function displayNextFrame() {
+    if (!isTransmitting || isPaused || !qrFrames.length) return;
+
+    if (currentFrameIndex >= qrFrames.length - 1) {
+        transmissionCompleted = true;
+        isPaused = true;
+        pauseButton.textContent = '▶ 最初から再生';
+        transmissionCompleteSection.style.display = 'block';
+        return;
+    }
+
+    currentFrameIndex++;
+    displayCurrentFrame();
+    scheduleNextFrame();
+}
+
 function stopTransmission() {
     isTransmitting = false;
-    
-    if (transmissionInterval) {
-        clearInterval(transmissionInterval);
-        transmissionInterval = null;
-    }
+    clearTransmissionTimer();
 }
 
-// 新規送信
-function newTransmission() {
-    // 送信中の場合は停止
-    if (isTransmitting) {
-        isTransmitting = false;
-        
-        if (transmissionInterval) {
-            clearInterval(transmissionInterval);
-            transmissionInterval = null;
-        }
-    }
-    
-    // UI更新
+async function newTransmission() {
+    stopTransmission();
+    await releaseWakeLock();
+
     controlSection.style.display = 'block';
     startButtonContainer.style.display = 'block';
+    startButton.disabled = false;
+    startButton.textContent = '送信開始';
     startTransmissionSection.style.display = 'none';
     newTransmissionButton.style.display = 'none';
     frameInfo.style.display = 'none';
@@ -244,255 +285,185 @@ function newTransmission() {
     manualControls.style.display = 'none';
     secondaryControls.style.display = 'none';
     transmissionCompleteSection.style.display = 'none';
+    senderContainer.classList.remove('qr-mode');
     qrDisplay.innerHTML = '<p>QRコードがここに表示されます</p>';
     resetQrDisplayState();
     isPaused = false;
-    pauseButton.innerHTML = '⏸ 一時停止';
-    
-    // テキストエリアをクリアしてフォーカス
+    transmissionCompleted = false;
+    pauseButton.textContent = '⏸ 一時停止';
+
     inputText.value = '';
     inputText.focus();
-    
-    // テキスト情報を更新
     updateTextInfo();
 }
 
-// QRコードフレームの生成
 async function generateQRFrames(text) {
     const frames = [];
-    
-    // データのハッシュ計算
+    const profile = TRANSMISSION_PROFILES[reliabilityMode.value] || TRANSMISSION_PROFILES.reliable;
     const dataHash = Utils.calculateHash(text);
     const dataSize = Utils.getByteLength(text);
-    
-    // データ分割（QRコード容量を考慮）
-    // プロトコルオーバーヘッド: "DAT|seq:X|data:|crc:12345678|b64:1" = 約40バイト
-    // Base64エンコード後は元の1.33倍のサイズになる
-    // QRコード（エラー訂正レベルL）は約2900バイトまで格納可能
-    const maxDataSize = 600; // QRコードに含められる実データサイズ（Base64エンコード前）
-    const chunks = Utils.splitData(text, maxDataSize);
-    
-    // ヘッダーQRコード生成
-    // 総フレーム数 = ヘッダー(1) + データフレーム(chunks.length) = chunks.length + 1
-    const totalFrameCount = chunks.length + 1;
-    const headerData = QRFormat.createHeader(totalFrameCount, dataSize, dataHash);
-    frames.push({
-        type: 'header',
-        data: headerData
+    const transfer = await Utils.compressText(text);
+    const chunks = Utils.splitBytes(transfer.bytes, profile.chunkSize);
+
+    const headerData = QRFormat.createHeader(chunks.length + 1, dataSize, dataHash, transfer.encoding, {
+        transferSize: transfer.bytes.length,
+        chunkSize: profile.chunkSize,
+        fecGroupSize: profile.fecGroupSize,
+        fecParityCount: profile.fecParityCount
     });
-    
-    // データQRコード生成
-    for (let i = 0; i < chunks.length; i++) {
-        const chunk = chunks[i];
-        const crc = Utils.calculateCRC(chunk);
-        const dataQR = QRFormat.createData(i + 1, chunk, crc);
-        
-        frames.push({
-            type: 'data',
-            sequence: i + 1,
-            data: dataQR
+    frames.push({ type: 'header', data: headerData });
+
+    for (let groupStart = 0; groupStart < chunks.length; groupStart += profile.fecGroupSize) {
+        const groupIndex = Math.floor(groupStart / profile.fecGroupSize);
+        const groupChunks = chunks.slice(groupStart, groupStart + profile.fecGroupSize);
+
+        groupChunks.forEach((chunk, localIndex) => {
+            const sequence = groupStart + localIndex + 1;
+            const encoded = Utils.bytesToBase64(chunk);
+            frames.push({
+                type: 'data',
+                sequence,
+                data: QRFormat.createData(sequence, encoded, Utils.calculateCRC(encoded), dataHash)
+            });
         });
+
+        const parityChunks = Utils.createParityChunks(groupChunks, profile.chunkSize);
+        parityChunks.forEach((parity, parityIndex) => {
+            const encoded = Utils.bytesToBase64(parity);
+            frames.push({
+                type: 'parity',
+                group: groupIndex,
+                parityIndex,
+                data: QRFormat.createParity(groupIndex, parityIndex, encoded, Utils.calculateCRC(encoded), dataHash)
+            });
+        });
+
+        if (groupIndex % 25 === 24) {
+            await new Promise(resolve => requestAnimationFrame(resolve));
+        }
     }
-    
-    return frames;
+
+    frames.slice(1).forEach((frame, index) => {
+        frame.displaySequence = index + 1;
+    });
+
+    return {
+        frames,
+        dataFrameCount: chunks.length,
+        compressed: transfer.encoding === 'GZIP',
+        profileLabel: profile.label
+    };
 }
 
-// 現在のフレームを表示（インデックスを変更しない）
 function displayCurrentFrame() {
-    if (!isTransmitting || qrFrames.length === 0) {
-        return;
-    }
-    
+    if (!isTransmitting || !qrFrames.length) return;
     const frame = qrFrames[currentFrameIndex];
-    
-    // フレーム情報更新（ヘッダーを除外して表示）
+
     if (frame.type === 'header') {
         currentFrame.textContent = 'H';
-        frameNumber.textContent = 'H';
+        frameNumber.textContent = '準備用QR';
+    } else if (frame.type === 'data') {
+        currentFrame.textContent = frame.displaySequence;
+        frameNumber.textContent = `${frame.displaySequence} / ${qrFrames.length - 1}（データ ${frame.sequence} / ${dataFrameCount}）`;
     } else {
-        currentFrame.textContent = frame.sequence;
-        frameNumber.textContent = frame.sequence + ' / ' + (qrFrames.length - 1);
+        currentFrame.textContent = frame.displaySequence;
+        frameNumber.textContent = `${frame.displaySequence} / ${qrFrames.length - 1}（復元用QR）`;
     }
-    
-    // QRコード生成と表示
-    renderQrCode(frame.data, QRCode.CorrectLevel.L);
+
+    renderQrCode(frame.data, QR_CORRECT_LEVEL());
 }
 
-// 次のフレームを表示
-function displayNextFrame() {
-    if (!isTransmitting || qrFrames.length === 0) {
-        return;
-    }
-    
-    const frame = qrFrames[currentFrameIndex];
-    
-    // フレーム情報更新（ヘッダーを除外して表示）
-    if (frame.type === 'header') {
-        currentFrame.textContent = 'H';
-        frameNumber.textContent = 'H';
-    } else {
-        currentFrame.textContent = frame.sequence;
-        frameNumber.textContent = frame.sequence + ' / ' + (qrFrames.length - 1);
-    }
-    
-    // QRコード生成と表示
-    // デバッグ: フレームデータサイズを表示
-    const frameByteSize = Utils.getByteLength(frame.data);
-    console.log(`フレーム${currentFrameIndex + 1} 総サイズ: ${frameByteSize}バイト（ASCII文字のみ）`);
-    console.log(`フレームデータ: ${frame.data.substring(0, 100)}...`);
-    
-    // データフレームの場合、詳細なサイズ情報を表示
-    if (frame.type === 'data') {
-        const parsed = QRFormat.parse(frame.data);
-        if (parsed && parsed.data) {
-            const decodedDataSize = Utils.getByteLength(parsed.data);
-            console.log(`  - デコード後データ: ${decodedDataSize}バイト`);
-            console.log(`  - Base64エンコード比: ${(frameByteSize / decodedDataSize).toFixed(2)}倍`);
-        }
-    }
-    
-    renderQrCode(frame.data, QRCode.CorrectLevel.L); // エラー訂正レベルをLに下げて容量を増やす
-    
-    // 次のフレームへ（一時停止中でなければ）
-    if (!isPaused) {
-        currentFrameIndex++;
-        
-        // 最後のフレームに到達した場合
-        if (currentFrameIndex >= qrFrames.length) {
-            // 送信完了処理
-            clearInterval(transmissionInterval);
-            transmissionInterval = null;
-            isPaused = true;
-            pauseButton.innerHTML = '▶ 再生';
-            transmissionCompleteSection.style.display = 'block';
-            return;
-        }
-        
-        // ヘッダーをスキップ
-        if (currentFrameIndex === 0) {
-            currentFrameIndex = 1;
-        }
-    }
-}
-
-// 手動切り替え関数
-function previousFrame() {
-    if (!isTransmitting || qrFrames.length === 0) return;
-    
-    // 一時停止して手動操作
+function pauseForManualControl() {
     isPaused = true;
-    pauseButton.innerHTML = '▶ 再生';
-    
+    transmissionCompleted = false;
+    clearTransmissionTimer();
+    pauseButton.textContent = '▶ 再生';
+    transmissionCompleteSection.style.display = 'none';
+}
+
+function previousFrame() {
+    if (!isTransmitting || !qrFrames.length) return;
+    pauseForManualControl();
     currentFrameIndex--;
-    // ヘッダーをスキップ
-    if (currentFrameIndex <= 0) {
-        currentFrameIndex = qrFrames.length - 1;
-    }
+    if (currentFrameIndex <= 0) currentFrameIndex = qrFrames.length - 1;
     displayCurrentFrame();
 }
 
 function nextFrame() {
-    if (!isTransmitting || qrFrames.length === 0) return;
-    
-    // 一時停止して手動操作
-    isPaused = true;
-    pauseButton.innerHTML = '▶ 再生';
-    
+    if (!isTransmitting || !qrFrames.length) return;
+    pauseForManualControl();
     currentFrameIndex++;
-    if (currentFrameIndex >= qrFrames.length) {
-        currentFrameIndex = 1; // ヘッダーをスキップ
-    }
+    if (currentFrameIndex >= qrFrames.length) currentFrameIndex = 1;
     displayCurrentFrame();
 }
 
 function togglePause() {
-    isPaused = !isPaused;
-    pauseButton.innerHTML = isPaused ? '▶ 再生' : '⏸ 一時停止';
+    if (!isTransmitting) return;
+
+    if (!isPaused) {
+        pauseForManualControl();
+        return;
+    }
+
+    if (transmissionCompleted || currentFrameIndex === 0) {
+        currentFrameIndex = 1;
+        transmissionCompleted = false;
+        displayCurrentFrame();
+    }
+    isPaused = false;
+    pauseButton.textContent = '⏸ 一時停止';
     transmissionCompleteSection.style.display = 'none';
+    scheduleNextFrame();
 }
 
-// フレームジャンプ機能
-function jumpToFrame(frameNumber) {
-    if (!isTransmitting || qrFrames.length === 0) return;
-    
-    // 一時停止して手動操作
-    isPaused = true;
-    pauseButton.innerHTML = '▶ 再生';
-    
-    // ヘッダーを考慮したインデックス計算
-    if (frameNumber === 0) {
-        currentFrameIndex = 0; // ヘッダー
-    } else {
-        currentFrameIndex = Math.max(1, Math.min(frameNumber, qrFrames.length - 1));
-    }
+function jumpToFrame(requestedFrame) {
+    if (!isTransmitting || !qrFrames.length) return;
+    pauseForManualControl();
+    currentFrameIndex = requestedFrame === 0
+        ? 0
+        : Math.max(1, Math.min(requestedFrame, qrFrames.length - 1));
     displayCurrentFrame();
 }
 
 function jumpToLastFrame() {
-    if (!isTransmitting || qrFrames.length === 0) return;
-    
-    jumpToFrame(qrFrames.length);
+    jumpToFrame(qrFrames.length - 1);
 }
 
-// Wake Lock API（画面スリープ防止）
-let wakeLock = null;
-
-async function requestWakeLock() {
-    try {
-        if ('wakeLock' in navigator) {
-            wakeLock = await navigator.wakeLock.request('screen');
-            console.log('Wake Lock取得成功');
-        }
-    } catch (err) {
-        console.log('Wake Lock取得失敗:', err);
-    }
-}
-
-async function releaseWakeLock() {
-    if (wakeLock !== null) {
-        await wakeLock.release();
-        wakeLock = null;
-        console.log('Wake Lock解放');
-    }
-}
-
-// 最初から再生
 function restartFromBeginning() {
-    if (!isTransmitting || qrFrames.length === 0) return;
-    
-    // インターバルをクリア
-    if (transmissionInterval) {
-        clearInterval(transmissionInterval);
-    }
-    
-    // 最初のデータフレームから再開
+    if (!isTransmitting || !qrFrames.length) return;
+    clearTransmissionTimer();
     currentFrameIndex = 1;
     isPaused = false;
-    pauseButton.innerHTML = '⏸ 一時停止';
+    transmissionCompleted = false;
+    pauseButton.textContent = '⏸ 一時停止';
     transmissionCompleteSection.style.display = 'none';
-    
     displayCurrentFrame();
-    
-    // インターバル再設定
-    const interval = parseInt(intervalSlider.value);
-    transmissionInterval = setInterval(displayNextFrame, interval);
+    scheduleNextFrame();
 }
 
-// ヘッダQR表示
 function showHeader() {
-    if (!isTransmitting || qrFrames.length === 0) return;
-    
-    // 一時停止して手動操作
-    isPaused = true;
-    pauseButton.innerHTML = '▶ 再生';
-    transmissionCompleteSection.style.display = 'none';
-    
-    // ヘッダーフレームを表示
+    if (!isTransmitting || !qrFrames.length) return;
+    pauseForManualControl();
     currentFrameIndex = 0;
     displayCurrentFrame();
 }
 
-// グローバル関数として登録
+async function requestWakeLock() {
+    try {
+        if ('wakeLock' in navigator && !wakeLock) wakeLock = await navigator.wakeLock.request('screen');
+    } catch (error) {
+        console.warn('Wake Lock取得失敗:', error);
+    }
+}
+
+async function releaseWakeLock() {
+    if (wakeLock) {
+        await wakeLock.release();
+        wakeLock = null;
+    }
+}
+
+window.startTransmission = startTransmission;
 window.startLoop = startLoop;
 window.previousFrame = previousFrame;
 window.nextFrame = nextFrame;
@@ -504,24 +475,11 @@ window.newTransmission = newTransmission;
 window.restartFromBeginning = restartFromBeginning;
 window.showHeader = showHeader;
 
-// 送信開始時にWake Lockを取得
-window.addEventListener('load', () => {
-    // 送信開始時の処理を修正
-    const originalStart = window.startTransmission;
-    window.startTransmission = async function() {
-        await requestWakeLock();
-        await originalStart();
-    };
-    
-    const originalStop = window.stopTransmission;
-    window.stopTransmission = async function() {
-        originalStop();
-        await releaseWakeLock();
-    };
+window.addEventListener('resize', () => {
+    if (lastRenderedData) renderQrCode(lastRenderedData, lastRenderedLevel || QR_CORRECT_LEVEL());
 });
 
-window.addEventListener('resize', () => {
-    if (lastRenderedData) {
-        renderQrCode(lastRenderedData, lastRenderedLevel || QRCode.CorrectLevel.L);
-    }
+window.addEventListener('beforeunload', () => {
+    clearTransmissionTimer();
+    releaseWakeLock();
 });

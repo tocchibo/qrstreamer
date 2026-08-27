@@ -61,6 +61,30 @@ input[type="range"] {
     margin: 10px 0;
 }
 
+.reliability-setting {
+    margin-top: 14px;
+}
+
+.reliability-setting label,
+.reliability-setting small {
+    display: block;
+}
+
+.reliability-setting select {
+    width: 100%;
+    margin: 6px 0;
+    padding: 9px 10px;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background: #ffffff;
+    color: var(--text-primary);
+    font-size: 14px;
+}
+
+.reliability-setting small {
+    color: var(--text-secondary);
+}
+
 button {
     background-color: var(--primary-color);
     color: white;
@@ -109,6 +133,19 @@ button.secondary {
 .qr-display canvas {
     max-width: 100%;
     height: auto;
+    display: block;
+}
+
+.qr-display.qr-active {
+    padding: 0;
+    border-color: transparent;
+    background: #ffffff;
+}
+
+.qr-quiet-zone {
+    display: inline-block;
+    line-height: 0;
+    background: #ffffff;
 }
 
 .qr-display.qr-active,
@@ -284,6 +321,12 @@ button.secondary {
     margin-bottom: 20px;
 }
 
+.transmission-summary {
+    margin-top: 10px;
+    color: var(--text-secondary);
+    font-size: 14px;
+}
+
 .start-transmission button {
     padding: 15px 30px;
     font-size: 18px;
@@ -408,6 +451,11 @@ button.secondary {
     color: white;
 }
 
+.frame-indicator.recovered {
+    background-color: #8e44ad;
+    border-color: #8e44ad;
+}
+
 .frame-indicator.header {
     background-color: var(--primary-color);
     border-color: var(--primary-color);
@@ -495,4 +543,13 @@ button.new-transmission {
     .container.sender .qr-display {
         min-height: 480px;
     }
+
+    .container.sender.qr-mode {
+        max-width: 1200px;
+    }
+}
+
+.container.sender.qr-mode > h1,
+.container.sender.qr-mode .input-section {
+    display: none;
 }

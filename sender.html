@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>QRStreamer - sender</title>
-    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/style.css?v=2">
     
     <!-- 外部ライブラリ（CDN） -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
@@ -20,6 +20,15 @@
             <div class="info">
                 文字数: <span id="charCount">0</span> / バイト数: <span id="byteCount">0</span>
             </div>
+            <div class="reliability-setting">
+                <label for="reliabilityMode">送信モード</label>
+                <select id="reliabilityMode">
+                    <option value="reliable" selected>読み取り優先（推奨）</option>
+                    <option value="balanced">バランス</option>
+                    <option value="compact">枚数優先</option>
+                </select>
+                <small>読み取り優先ほどQRは増えますが、1回の送信で復元しやすくなります。</small>
+            </div>
         </div>
         
         <div class="control-section" id="controlSection">
@@ -30,6 +39,7 @@
                 <div class="instruction">
                     📱 受信側でこのQRコードをスキャンしてください<br>
                     準備完了の指示があったら下のボタンを押してください
+                    <div id="transmissionSummary" class="transmission-summary"></div>
                 </div>
                 <button id="startLoopButton" onclick="startLoop()">データ送信を開始</button>
             </div>
@@ -67,9 +77,9 @@
         
         <div class="interval-section" style="margin-top: 30px;">
             <label for="intervalSlider">
-                表示間隔: <span id="intervalValue">1000</span>ms
+                1枚の表示時間: <span id="intervalValue">600</span>ms
             </label>
-            <input type="range" id="intervalSlider" min="500" max="3000" value="1000" step="100">
+            <input type="range" id="intervalSlider" min="300" max="2000" value="600" step="50">
         </div>
         
         <div class="new-transmission-section" style="text-align: center; margin-top: 30px;">
@@ -82,7 +92,7 @@
     </div>
     
     <!-- 共通処理とアプリ固有処理 -->
-    <script src="js/common.js"></script>
-    <script src="js/sender.js"></script>
+    <script src="js/common.js?v=2"></script>
+    <script src="js/sender.js?v=2"></script>
 </body>
 </html>
