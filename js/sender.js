@@ -15,8 +15,8 @@ const TRANSMISSION_PROFILES = {
     },
     compact: {
         label: '枚数優先',
-        chunkSize: 420,
-        fecGroupSize: 12,
+        chunkSize: 520,
+        fecGroupSize: 16,
         fecParityCount: 2
     }
 };
@@ -133,7 +133,12 @@ function getModuleCount(data, correctLevel) {
 
 function suppressQrTooltips(target) {
     if (!target) return;
+    target.removeAttribute('title');
     target.querySelectorAll('[title]').forEach(node => node.removeAttribute('title'));
+    target.querySelectorAll('img').forEach(image => {
+        image.alt = '';
+        image.draggable = false;
+    });
 }
 
 function renderQrCode(data, correctLevel) {
@@ -156,6 +161,7 @@ function renderQrCode(data, correctLevel) {
 
     const quietZoneContainer = document.createElement('div');
     quietZoneContainer.className = 'qr-quiet-zone';
+    quietZoneContainer.setAttribute('aria-hidden', 'true');
     quietZoneContainer.style.padding = `${quietZone}px`;
     const codeContainer = document.createElement('div');
     quietZoneContainer.appendChild(codeContainer);

@@ -146,6 +146,7 @@ button.secondary {
     display: inline-block;
     line-height: 0;
     background: #ffffff;
+    pointer-events: none;
 }
 
 .qr-display.qr-active,
